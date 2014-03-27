@@ -92,6 +92,8 @@ if($INC{'Term/ANSIColor.pm'}) {
   $ansi_last_doing = CYAN() . BOLD() . $last_doing . RESET();
 }
 
+#// '\x1b[36;1m'+last_doing+'\x1b[0m'
+
 print qq{Ditto (") to repeat prev tags: $ansi_last_doing\n\n};
 
 my($resp, $tagstr, $comments, $a);
