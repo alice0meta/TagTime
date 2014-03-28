@@ -139,27 +139,31 @@ var tagtime_rng = new function(){
 // beeps at appropriate times and opens ping windows
 function main(){
 	var start = now()
-	var last_ping = tagtime_rng.prev_ping(start)
-	var next_ping = tagtime_rng.next_ping(last_ping)
+	var last = tagtime_rng.prev_ping(start)
+	var next = tagtime_rng.next_ping(last)
 
 	pings_if()
 
-	print("TagTime is watching you! Last ping would've been",pretty_time(now()-last_ping),'ago')
+	print("TagTime is watching you! Last ping would've been",pretty_time(now()-last),'ago')
 
 	var i = 1
-	setInterval(function(){
+	var in_sync = false // ugly lock hack
+	setInterval(function(){sync(function(){
+		if (in_sync) return; in_sync = true
 		var time = now()
-		if (next_ping <= time) {
-			if (rc.catchup || next_ping > time-rc.retro_threshold)
+		print('in',i,next,time,time-next)
+		if (next <= time) {
+			if (rc.catchup || next > time-rc.retro_threshold)
 				print('\u0007')
 			pings_if()
 			time = now()
-			print(annotate_timestamp(pad(i+'',' ',4)+': PING! gap '+pretty_time(next_ping-last_ping)+'  avg '+pretty_time((time-start)/i)+' tot '+pretty_time(time-start), next_ping))
-			last_ping = next_ping
-			next_ping = tagtime_rng.next_ping(next_ping)
+			print(annotate_timestamp(pad(i+'',' ',4)+': PING! gap '+pretty_time(next-last)+'  avg '+pretty_time((time-start)/i)+' tot '+pretty_time(time-start), next))
+			last = next
+			next = tagtime_rng.next_ping(tagtime_rng.next_ping(tagtime_rng.prev_ping(next)))
 			i += 1
 		}
-	},1000)
+		in_sync = false
+	})},1000)
 	}
 
 // handle any pings between the last recorded ping and now
@@ -168,25 +172,25 @@ function pings_if(){
 	var launch_time = now()
 
 	var last_log_line = read_lines(logf()).slice(-1)[0]
-	var last_ping = last_log_line===undefined? tagtime_rng.prev_ping(launch_time) : parseInt(last_log_line.match(/^\d+/)[0])
-	var next_ping
-	if (last_ping === tagtime_rng.next_ping(tagtime_rng.prev_ping(last_ping))) {
-		next_ping = tagtime_rng.next_ping(last_ping)
+	var last = last_log_line===undefined? tagtime_rng.prev_ping(launch_time) : parseInt(last_log_line.match(/^\d+/)[0])
+	var next
+	if (last === tagtime_rng.next_ping(tagtime_rng.prev_ping(last))) {
+		next = tagtime_rng.next_ping(last)
 	} else {
 		print('TagTime log file ('+logf()+') has bad last line:\n'+last_log_line)
-		next_ping = tagtime_rng.next_ping(tagtime_rng.prev_ping(last_ping))
-		//! probably remove: next_ping = tagtime_rng.prev_ping(launch_time)
+		next = tagtime_rng.next_ping(tagtime_rng.prev_ping(last))
+		//! probably remove: next = tagtime_rng.prev_ping(launch_time)
 	}
 
-	while (next_ping <= now()) {
-		if (next_ping < now()-rc.retro_threshold) {
-			var tags = next_ping < launch_time-rc.retro_threshold? ' afk off RETRO' : ' afk RETRO'
-			slog(annotate_timestamp(next_ping+tags,next_ping))
+	while (next <= now()) {
+		if (next < now()-rc.retro_threshold) {
+			var tags = next < launch_time-rc.retro_threshold? ' afk off RETRO' : ' afk RETRO'
+			slog(annotate_timestamp(next+tags,next))
 			//!todo: give an opportunity to then edit the pings in an editor
 		} else {
-			ping(next_ping,[]) // blocking
+			ping(next,[]) // blocking
 		}
-		next_ping = tagtime_rng.next_ping(next_ping)
+		next = tagtime_rng.next_ping(next)
 	}
 	}
 
