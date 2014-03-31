@@ -7,7 +7,6 @@ var exec = require('child_process').exec
 
 sync(function(){
 
-// todo: implement commands: install grppings cntpings tskedit tskproc merge
 // todo: have read_graph cache its results
 // todo: exit silently if tagtime is already running
 // todo: update_graph should print more useful things
@@ -16,6 +15,9 @@ sync(function(){
 // todo: use rc settings: editor terminal enforce_nums
 // todo: cope with empty log file
 // todo: cope with missing rc file
+// todo: current afk behavior is undesirable in many ways
+// ‽ todo: make this into a webapp hosted on github?
+// todo: implement Paul and Benja's idea of making all ping schedules synced regardless of gap (if you have a smaller gap then you'll just get *additional* pings in between. Or if bigger you just will not get some of the pings)
 
 var GAP = 45*60
 var INIT_SEED = 666
@@ -151,7 +153,6 @@ function main(){
 	setInterval(function(){sync(function(){
 		if (in_sync) return; in_sync = true
 		var time = now()
-		print('in',i,next,time,time-next)
 		if (next <= time) {
 			if (rc.catchup || next > time-rc.retro_threshold)
 				print('\u0007')
@@ -188,15 +189,15 @@ function pings_if(){
 			slog(annotate_timestamp(next+tags,next))
 			//!todo: give an opportunity to then edit the pings in an editor
 		} else {
-			ping(next,[]) // blocking
+			ping(next) // blocking
 		}
 		next = tagtime_rng.next_ping(next)
 	}
 	}
 
 // prompt for what you're doing RIGHT NOW. blocks until completion.
-function ping(time,auto_tags){exec.sync(null,'start bash -ci "tagtime.js ping_process '+Math.round(time)+' '+auto_tags.join(' ')+';pause"')}
-function ping_process(time,auto_tags){
+function ping(time){exec.sync(null,'start bash -ci "tagtime.js ping_process '+Math.round(time)+';pause"')}
+function ping_process(time){
 	// Return what the user was last doing by extracting it from their logfile.
 	function get_last_doing(){var t = read_lines(logf()).slice(-1)[0]; return t?t.match(/^\d+([^\[(]+)/)[1].trim():''}
 
@@ -337,38 +338,36 @@ function update_graph(user_slug,new_graph){
 		}
 	} }
 
-//===--------------------------------------------===// choose command from argv //===--------------------------------------------===//
+//===--------------------------------------------===// choose from argv //===--------------------------------------------===//
 
+if (!module.parent) {
+	if (process.argv.length===2) main()
+	else if (process.argv.length===4 && process.argv[2]==='ping_process') ping_process(parseInt(process.argv[3]))
+	else print('usage: ./tagtime.js')
+}
+
+/*
+//===--------------------------------------------===// choose command from argv //===--------------------------------------------===//
 var commands = new function(){
 	var varargs = function(f){f.varargs = true; return f}
 
-	this.e = function(v){print(eval(v))}
-	
-	this.tagtimed = this.undefined = main
-	this.launch = pings_if
-	this.ping = function(time){ping(time || now(),time?[]:['UNSCHED'])}
-	this.ping_process = varargs(ping_process)
-
-	this.install = function(username){throw 'install not yet implemented'}
+	this.undefined = main
 	this.grppings = varargs(function(log_file,exprs){throw 'grppings not yet implemented'})
 	this.cntpings = varargs(function(log_file,exprs){throw 'cntpings not yet implemented'})
 	this.tskedit = function(){throw 'tskedit not yet implemented'}
 	this.merge = varargs(function(log_files){throw 'merge not yet implemented'})
-	this.beeminder = function(log_file,user_slug){update_graph(user_slug,read_log_file(log_file))}
 
 	this.help = function(){
 		print('usage: ')
-		print('  ./tagtime.js tagtimed?                 : the TagTime daemon')
-		print('  ./tagtime.js launch                    : runs ping for any unhandled pings')
-		print('  ./tagtime.js ping timestamp?           : prompts for the tags')
-		print('  ---')
-		print('  ./tagtime.js install username          : install script')
-		print('  ./tagtime.js grppings log_file exprs+  : grep your TagTime log file')
-		print('  ./tagtime.js cntpings log_file exprs+  : tally pings matching given criteria')
-		print('  ./tagtime.js tskedit                   : todo list that integrates w/ TagTime')
-		print('  ./tagtime.js merge log_file+           : for fixing/merging TagTime logs')
-		print('  ./tagtime.js beeminder log_f user/slug : uploads to a beeminder graph')
+		print('  ./tagtime.js                          : the TagTime daemon')
+		print('  ./tagtime.js grppings log_file exprs+ : grep your TagTime log file')
+		print('  ./tagtime.js cntpings log_file exprs+ : tally pings matching given criteria')
+		print('  ./tagtime.js tskedit                  : todo list that integrates w/ TagTime')
+		print('  ./tagtime.js merge log_file+          : for fixing/merging TagTime logs')
 		}
+
+	//this.e = function(v){print(eval(v))}
+	this.ping_process = ping_process
 	}
 ;(function(){
 	var f = commands[process.argv[2]]||commands.help
@@ -377,5 +376,6 @@ var commands = new function(){
 	try {f.apply(null,f.varargs? args.slice(0,f.length-1).concat([args.slice(f.length-1)]) : args)}
 	catch (e) {print('error!',e,e.message,e.stack)}
 	})()
+*/
 
 })
