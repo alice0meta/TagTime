@@ -21,6 +21,9 @@
 	retro_threshold: 60, // Pings from more than this many seconds ago get autologged with tags "afk" and "RETRO". (Pings can be overdue either because the computer was off or tagtime was waiting for you to answer a previous ping. If the computer was off, the tag "off" is also added.)
 	catchup: false, // Whether it beeps for old pings, ie, should it beep a bunch of times in a row when the computer wakes from sleep.
 
+	period: 45*60, // Average number of seconds between pings (eg, 60*60 = 1 hour)
+	seed: 666, // For pings not in sync with others, change this
+
 	log_file: '', // log file for pings
 	editor: '', // "CHANGEME if you don't like vi (eg: /usr/bin/pico)"
 	terminal: '', // "CHANGEME to your path to xterm"

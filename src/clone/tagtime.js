@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 var fs = require('fs')
-var rc = eval(fs.readFileSync(process.env.HOME+'/.tagtime_rc')+'')
 var sync = require('sync')
+//var L = require('lazy.js')
 var exec = require('child_process').exec
 
-sync(function(){
+sync(function(){try {
 
 // todo: have read_graph cache its results
 // todo: exit silently if tagtime is already running
@@ -17,10 +17,7 @@ sync(function(){
 // todo: cope with missing rc file
 // todo: current afk behavior is undesirable in many ways
 // ‽ todo: make this into a webapp hosted on github?
-// todo: implement Paul and Benja's idea of making all ping schedules synced regardless of gap (if you have a smaller gap then you'll just get *additional* pings in between. Or if bigger you just will not get some of the pings)
-
-var GAP = 45*60
-var INIT_SEED = 666
+// todo: make the ping algorithm not slow to start up
 
 ////////////////////////////////////////////////////
 /////  THE FOLLOWING IS COPIED FROM ELSEWHERE  ///// userscripts/gitminder, lang-alpha, stopwatch.js
@@ -30,12 +27,12 @@ var INIT_SEED = 666
 	var merge_o = function(a,b){var r = {}; Object.keys(a).forEach(function(k){r[k] = a[k]}); Object.keys(b).forEach(function(k){r[k] = b[k]}); return r}
 	var seq = function(v){return typeof v === 'string'? v.split('') : v instanceof Array? v : Object.keys(v).map(function(k){return [k,v[k]]})}
 	var pad_left = function(v,s,l){while (v.length < l) v = s + v; return v}
-	function frequencies(v){var r = {}; v.forEach(function(v){r[v] = v in r? r[v]+1 : 1}); return r}
+	var frequencies = function(v){return v.reduce(function(r,v){r[v] = v in r? r[v]+1 : 1; return r},{})}
 	function dict_by(sq,f){var r = {}; for(var i=0;i<sq.length;i++) r[f(sq[i])] = sq[i]; return r}
 	Date.prototype.hours = function(v){this.setHours(this.getHours()+v); return this}
 	Date.prototype.yyyy_mm_dd = function(){var m = (this.getMonth()+1)+''; var d = this.getDate()+''; return this.getFullYear()+'-'+(m[1]?m:'0'+m)+'-'+(d[1]?d:'0'+d)}
 	function now(){return Date.now() / 1000}
-	String.prototype.repeat = function(v){return new Array(v+1).join(this)}
+	String.prototype.repeat = function(v){return v<=0? '' : new Array(v+1).join(this)}
 	var pad = function(v,s,l){while (v.length < l) v = s+v; return v}
 	var pretty_time = function λ(v){
 		v = Math.round(v)
@@ -45,6 +42,12 @@ var INIT_SEED = 666
 	/////////////////////////////////////////////////////////
 	//////////////////  END COPIED SECTION  /////////////////
 	/////////////////////////////////////////////////////////
+
+//===--------------------------------------------===// load rc file //===--------------------------------------------===//
+
+var rc = eval(fs.readFileSync(process.env.HOME+'/.tagtime_rc')+'')
+if (rc.period < 45*60) print('WARNING: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:'+rc.period+')')
+if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) print('WARNING: seeds should probably be (1) positive (2) not too close to each other (3) not too big (seed:'+rc.seed+')')
 
 //===--------------------------------------------===// hacky hacky beeminder api //===--------------------------------------------===//
 
@@ -73,67 +76,104 @@ var INIT_SEED = 666
 	function beeminder_update(slug,id,query,cb){beeminder('PUT /users/me/goals/'+slug+'/datapoints/'+id+'.json',query,cb||function(e,v){print('beeminder_update returned:',v)})}
 
 //===--------------------------------------------===// util (mostly hacky) //===--------------------------------------------===//
+/*
+L.prototype.generate_memoized_o_sparse_sequential_len = function(){
+	var t = function(f,cache){this.f = f; this.cache = cache || {}; this.len = 0}
+	t.prototype = new L.Sequence()
+	t.prototype.get_ = function(i){
+		var j = i-1; while (this.cache[j]===undefined) j -= 1
+		var v = this.get(j); for (var k=j+1;k<=i;k++) v = f(v); return v}
+	t.prototype.get = function(i){if (this.cache[i]===undefined) {this.cache[i] = this.get_(i); this.len = Math.max(this.len,i+1)} return this.cache[i]}
+	t.prototype.get_by = function(f){}
+	t.prototype.length = function(){return this.len}
+	t.prototype.last = function(){return this.get(this.length()-1)}
+	return function(f,cache){return new t(f,cache)} }()*/
 
 var err = function(v){throw Error(v)}
 var pluralize = function(n,noun){return n+' '+noun+(n==1?'':'s')}
-var dd = function(v){return pad(v+'','0',2)}
 var divider = function(v){ // 'foo' → '-----foo-----' of length rc.log_line_length
 	var left = Math.floor((rc.log_line_length - v.length)/2), right = rc.log_line_length - left - v.length
 	return '-'.repeat(left)+v+'-'.repeat(right)}
 var logf = function(){return rc.log_file || rc.user+'.log'}
 var slog = function(v){fs.appendFileSync(logf(),v+'\n')}
-var dt = function(v){v = v || now() // Date/time: Takes unixtime in seconds and returns list of [year, mon, day, hr, min, sec, day-of-week, day-of-year, is-daylight-time]
-	Date.prototype.stdTimezoneOffset = function(){return Math.max(new Date(this.getFullYear(), 0, 1).getTimezoneOffset(), new Date(this.getFullYear(), 6, 1).getTimezoneOffset())}
-	Date.prototype.dst = function(){return this.getTimezoneOffset() < this.stdTimezoneOffset()}
-	var getDOY = function(v){var onejan = new Date(v.getFullYear(),0,1); return Math.ceil((v - onejan) / 86400000)}
-	v = new Date(v*1000)
-	return [v.getFullYear(),dd(v.getMonth()+1),dd(v.getDate()),dd(v.getHours()),dd(v.getMinutes()),dd(v.getSeconds()),'SUN MON TUE WED THU FRI SAT'.split(' ')[v.getDay()],getDOY(v),v.dst()]}
-var annotate_timestamp = function(v,time){ 
-	function lrjust(a,b){return a+' '+' '.repeat(Math.max(0,rc.log_line_length-(a+' '+b).length))+b}
-	var _ = dt(time); var yea=_[0],o=_[1],d=_[2],h=_[3],m=_[4],s=_[5],wd=_[6]
+var bind = function(o,f){return o[f].bind(o)}
+var def_get_proto = function(o,m,f){Object.defineProperty(o.prototype,m,{get:f})}
+
+def_get_proto(Date,'yyyy',function(){return this.getFullYear()+''})
+def_get_proto(Date,'MM',function(){return pad(this.getMonth()+1+'','0',2)})
+def_get_proto(Date,'dd',function(){return pad(this.getDate()+'','0',2)})
+def_get_proto(Date,'hh',function(){return pad(this.getHours()+'','0',2)})
+def_get_proto(Date,'mm',function(){return pad(this.getMinutes()+'','0',2)})
+def_get_proto(Date,'ss',function(){return pad(this.getSeconds()+'','0',2)})
+def_get_proto(Date,'weekday',function(){return seq('UMTWRFS')[this.getDay()]})
+def_get_proto(Date,'day_in_year',function(){return Math.ceil((this - new Date(this.getFullYear(),0,1))/24/60/60/1000)})
+Date.prototype.hacky_format = function(v){var me = this; return v.split(/\b/).map(function(v){return me[v]||v}).join('')}
+var annotate_timestamp = function(v,time){
+	function lrjust(l,a,b){return a+' '+' '.repeat(l-(a+' '+b).length)+b}
+	function lrjust_e(l,a,b){var r = lrjust(l,a,b); if (r.length===l) return r}
 	return [
-		'['+yea+'.'+o+'.'+d+' '+h+':'+m+':'+s+' '+wd+']',
-		'['+o+'.'+d+' '+h+':'+m+':'+s+' '+wd+']',
-		'['+d+' '+h+':'+m+':'+s+' '+wd+']',
-		'['+o+'.'+d+' '+h+':'+m+':'+s+']',
-		'['+h+':'+m+':'+s+' '+wd+']',
-		'['+o+'.'+d+' '+h+':'+m+']',
-		'['+h+':'+m+' '+wd+']',
-		'['+h+':'+m+':'+s+']',
-		'['+h+':'+m+']',
-		'['+m+']'
-		].map(function(t){if ((v+' '+t).length <= rc.log_line_length) return lrjust(v,t)}).filter(function(v){return v})[0] || v}
+		'[yyyy-MM-dd/hh:mm:ss weekday]',
+		'[yyyy-MM-dd/hh:mm:ss]',
+		'[MM-dd/hh:mm:ss]',
+		'[dd/hh:mm:ss]',
+		'[hh:mm:ss]',
+		'[hh:mm]'
+		].map(bind(new Date(time*1000),'hacky_format')).map(function(t){return lrjust_e(rc.log_line_length,v,t)}).filter(function(v){return v})[0] || v}
 
 var read_lines = function(fl){return (fs.readFileSync(fl)+'').split('\n').filter(function(v){return v!==''})}
 var ymd_yesterday = function(v){var t = v.match(/^(\d+)-(\d+)-(\d+)$/); return new Date(new Date(parseInt(t[1]),parseInt(t[2])-1,parseInt(t[3])).setHours(-12)).yyyy_mm_dd()}
 var ymd_tomorrow  = function(v){var t = v.match(/^(\d+)-(\d+)-(\d+)$/); return new Date(new Date(parseInt(t[1]),parseInt(t[2])-1,parseInt(t[3])).setHours( 36)).yyyy_mm_dd()}
 var ymd_to_seconds = function(v){var t = v.match(/^(\d+)-(\d+)-(\d+)$/); return new Date(parseInt(t[1]),parseInt(t[2])-1,parseInt(t[3])).setHours(12)/1000}
 
-var tagtime_rng = new function(){
-	var IA = 16807      // 7^5: constant used for RNG (see p37 of Simulation by Ross)
-	var IM = 2147483647 // 2^31-1: constant used for RNG
-	var seed = INIT_SEED // a global variable that is really the state of the RNG.
-	
-	function ran0(){return (seed = IA*seed % IM)} // Returns a random integer in [1,IM-1]; changes seed, ie, RNG state. (This is ran0 from Numerical Recipes and has a period of ~2 billion.)
-	function exprand(){return -(GAP*Math.log(ran0()/IM))}
+//===--------------------------------------------===// ping algorithm //===--------------------------------------------===//
 
-	this.prev_ping = function(time){
-		seed = INIT_SEED
-		//!‽ Starting at the beginning of time, walk forward computing next pings until the next ping is >= t.
-		//!‽ this takes 78526 iterations as of 2014-03-27/16:19
-		var nxtping = 1184083200 // the birth of timepie/tagtime!
-		var lstping = nxtping
-		var lstseed = seed
-		while (nxtping < time) {
-			lstping = nxtping
-			lstseed = seed
-			nxtping = this.next_ping(nxtping)
-			}
-		seed = lstseed
-		return lstping}
-	// Takes previous ping time, returns random next ping time (unixtime).
-	// NB: this has the side effect of changing the RNG state ($seed) and so should only be called once per next ping to calculate, after calling prevping.
-	this.next_ping = function(prev){return Math.max(prev+1,Math.round(prev+exprand()))}
+var pings = new function(){
+	// utils
+	var bit_reverse = function(length,v){var r = 0; for (var i=0;i<length;i++){r = (r << 1) | (v & 1); v = v >> 1}; return r}
+	var i32_mul_mod = function(a,b,m) { // a*b % m
+		var ah = (a >> 16) & 0xffff, al = a & 0xffff
+		var bh = (b >> 16) & 0xffff, bl = b & 0xffff
+		return (al*bl + ((ah*bl + al*bh) * Math.pow(2,16)) + ah*bh * (Math.pow(2,32) % m)) % m}
+	var pow_mod = function(v,e,m){ // vᵉ % m
+		var r = 1; while (e > 0) {if (e % 2 === 1) r = i32_mul_mod(r,v,m); v = i32_mul_mod(v,v,m); e = e >> 1}; return r}
+	var range = function(l){var r = []; for (var i=0;i<l;i++) r.push(i); return r}
+	Array.prototype.min_by = function(f){
+		if (this.length <= 1) return this[0]
+		var r = this[0]; var fr = f(r)
+		this.slice(1).map(function(v){var t = f(v); if (t < fr) {r = v; fr = t}})
+		return r}
+	Array.prototype.max_by = function(f){
+		if (this.length <= 1) return this[0]
+		var r = this[0]; var fr = f(r)
+		this.slice(1).map(function(v){var t = f(v); if (t > fr) {r = v; fr = t}})
+		return r}
+	
+	// see p37 of Simulation by Ross
+	//var ran0 = function(seed){return Math.pow(7,5)*seed % (Math.pow(2,31)-1)} // ran0 from Numerical Recipes
+	var ran0_closed = function(seed,i){return seed*pow_mod(Math.pow(7,5),i+1,(Math.pow(2,31)-1)) % (Math.pow(2,31)-1)}
+	var interval = function(seed,i){return Math.max(1,Math.round(-45*60*Math.log(ran0_closed(seed,i) / (Math.pow(2,31)-1))))}
+
+	var seq_count = 45*60 / rc.period
+	var seq_fraction = seq_count+1 - Math.ceil(seq_count)
+
+	var seqs
+
+	var again = seq_fraction===1? function(v){return false} : function(v){return v===seqs.slice(-1)[0] && !(bit_reverse(31,ran0_closed(v.seed,v.i)) / (Math.pow(2,31)-1) <= seq_fraction)}
+	var next_s = function λ(v){var t = again(v); v.ping += interval(v.seed,v.i); v.i+=1; return t? λ(v) : v}
+	var prev_s = function λ(v){v.i-=1; v.ping -= interval(v.seed,v.i); return again(v)? λ(v) : v}
+	var get = function(){return seqs.min_by(function(v){return v.ping}).ping}
+	var next = function(){next_s(seqs.min_by(function(v){return v.ping})); return get()}
+	var prev = function(){prev_s(seqs.max_by(function(v){return v.ping - interval(v.seed,v.i-1)})); return get()}
+
+	if (Math.ceil(seq_count)===1 && rc.seed===666) {seqs = [{seed:rc.seed, i:78922, ping:1397086515}]; prev()} // optimization: a recent seqs
+	else seqs = range(Math.ceil(seq_count)).map(function(v){return next_s({seed:rc.seed+v, i:0, ping:1184083200})}) // the birth of timepie/tagtime!
+
+	// time → last scheduled ping time < time
+	this.prev = function(time){while (get() < time) next(); while (get() >= time) prev(); return get()}
+	// time → first scheduled ping time > time
+	this.next = function(time){while (get() > time) prev(); while (get() <= time) next(); return get()}
+	// time → first scheduled ping time ≥ time
+	this.get  = function(time){while (get() >= time) prev(); while (get() < time) next(); return get()}
 	}
 
 //===--------------------------------------------===// functions loosely corresponding to commands //===--------------------------------------------===//
@@ -141,13 +181,13 @@ var tagtime_rng = new function(){
 // beeps at appropriate times and opens ping windows
 function main(){
 	var start = now()
-	var last = tagtime_rng.prev_ping(start)
-	var next = tagtime_rng.next_ping(last)
+	var last = pings.prev(start)
 
 	pings_if()
 
 	print("TagTime is watching you! Last ping would've been",pretty_time(now()-last),'ago')
 
+	var next = pings.next(last)
 	var i = 1
 	var in_sync = false // ugly lock hack
 	setInterval(function(){sync(function(){
@@ -160,7 +200,7 @@ function main(){
 			time = now()
 			print(annotate_timestamp(pad(i+'',' ',4)+': PING! gap '+pretty_time(next-last)+'  avg '+pretty_time((time-start)/i)+' tot '+pretty_time(time-start), next))
 			last = next
-			next = tagtime_rng.next_ping(tagtime_rng.next_ping(tagtime_rng.prev_ping(next)))
+			next = pings.next(next)
 			i += 1
 		}
 		in_sync = false
@@ -170,18 +210,16 @@ function main(){
 // handle any pings between the last recorded ping and now
 //! skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level
 function pings_if(){
-	var launch_time = now()
+	var launch_time = now() //! ??
 
 	var last_log_line = read_lines(logf()).slice(-1)[0]
-	var last = last_log_line===undefined? tagtime_rng.prev_ping(launch_time) : parseInt(last_log_line.match(/^\d+/)[0])
-	var next
-	if (last === tagtime_rng.next_ping(tagtime_rng.prev_ping(last))) {
-		next = tagtime_rng.next_ping(last)
-	} else {
+	var last = last_log_line===undefined? pings.prev(launch_time) : parseInt(last_log_line.match(/^\d+/)[0])
+	var next = pings.get(last)
+	if (next !== last) {
 		print('TagTime log file ('+logf()+') has bad last line:\n'+last_log_line)
-		next = tagtime_rng.next_ping(tagtime_rng.prev_ping(last))
-		//! probably remove: next = tagtime_rng.prev_ping(launch_time)
+		//! probably remove: next = pings.prev(launch_time)
 	}
+	next = pings.next(next)
 
 	while (next <= now()) {
 		if (next < now()-rc.retro_threshold) {
@@ -191,7 +229,7 @@ function pings_if(){
 		} else {
 			ping(next) // blocking
 		}
-		next = tagtime_rng.next_ping(next)
+		next = pings.next(next)
 	}
 	}
 
@@ -207,7 +245,7 @@ function ping_process(time){
 		print(divider(''))
 		print(divider(' WARNING '.repeat(8)))
 		print(divider(''))
-		print('This popup is',ping_time - t,'seconds late.')
+		print('This popup is',ping_time - time,'seconds late.')
 		print('Either you were answering a previous ping when this tried to pop up, or you')
 		print("just started tagtime, or your computer's extremely sluggish.")
 		print(divider(''))
@@ -241,11 +279,12 @@ function ping_process(time){
 		//  print "\n";
 		//}
 
-	var t = new Date(time*1000); var s = dd(t.getSeconds()), m = dd(t.getMinutes()), h = dd(t.getHours()), d = dd(t.getDate())
-	print("It's tag time! What are you doing RIGHT NOW ("+h+":"+m+":"+s+")?")
+	print("It's tag time! What are you doing RIGHT NOW ("+new Date(time*1000).hacky_format('hh:mm:ss')+')?')
 
 	var last_doing = get_last_doing()
-	print('Ditto (") to repeat prev tags:','\x1b[36;1m'+last_doing+'\x1b[0m')
+	function cyan (v){return '\x1b[36;1m'+v+'\x1b[0m'}
+	function green(v){return '\x1b[32;1m'+v+'\x1b[0m'}
+	print('Ditto ('+cyan('"')+') to repeat prev tags:',cyan(last_doing))
 
 	var read_once = false
 	process.stdin.on('readable', function(_){sync(function(){
@@ -274,7 +313,7 @@ function ping_process(time){
 			//! original tagtime parses out comments from resp here, as distinct from tags, but i don't understand what it is
 			var tags = resp.split(/\s+/)//!.concat(auto_tags)
 			var t = annotate_timestamp(time+' '+tags.join(' '),time)
-			print('\x1b[32m'+t+'\x1b[0m')
+			print(green(t))
 			slog(t)
 
 			if (Object.keys(rc.beeminder).length > 0 && resp!=='') {
@@ -318,7 +357,8 @@ function update_graph(user_slug,new_graph){
 		var id = (graph[day]||{}).id
 		var pings_old = (graph[day]||{}).pings;     var ol = (pings_old||[]).length; var o = (pings_old||[]).join(', ')
 		var pings_new = (new_graph[day]||{}).pings; var nl = (pings_new||[]).length; var n = (pings_new||[]).join(', ')
-		var v = {timestamp:ymd_to_seconds(day), value:nl*GAP/3600, comment:pluralize(nl,'ping')+': '+n}
+		var v = {timestamp:ymd_to_seconds(day), value:nl*rc.period/3600, comment:pluralize(nl,'ping')+': '+n}
+		//! oh dear that is not good; pings should log how much they're worth
 		if (ol===nl && o===n) { // no change to the datapoint on this day
 		} else if (id===undefined && nl > 0) { // no such datapoint on beeminder: CREATE
 			print('creating datapoint',v.value,v.comment)
@@ -343,6 +383,7 @@ function update_graph(user_slug,new_graph){
 if (!module.parent) {
 	if (process.argv.length===2) main()
 	else if (process.argv.length===4 && process.argv[2]==='ping_process') ping_process(parseInt(process.argv[3]))
+	else if (process.argv.length===4 && process.argv[2]==='e') print(eval(process.argv[3]))
 	else print('usage: ./tagtime.js')
 }
 
@@ -378,4 +419,4 @@ var commands = new function(){
 	})()
 */
 
-})
+} catch (e) {print('error!',e,e.message,e.stack)}})
