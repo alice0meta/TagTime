@@ -26,6 +26,5 @@
 	log_file: '', // log file for pings
 	editor: '', // "CHANGEME if you don't like vi (eg: /usr/bin/pico)"
 	terminal: '', // "CHANGEME to your path to xterm"
-	log_line_length: 79, // Try to keep log lines at most this long.
 	enforce_nums: false // Whether it forces you to include a number in your ping response (include tag non or nonXX where XX is day  of month to override). This is for task editor integration.
 })
