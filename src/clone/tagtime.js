@@ -20,6 +20,8 @@ var exec = require('child_process').exec
 // //! comments
 // actually should be cool with goal formats like 31 0.75 "TagTime ping: bee spt" 31 0.75 "TagTime ping: bee spt"
 // maybe refactor ping algorithm *again* to avoid maintaining state
+// so the log entries fail to record both (1) ping frequency and (2) time zone . this is somewhat problematic.
+// refactor things to be less synchronous
 
 var err_print = function(f){return function(){try{f()} catch (e) {print('error!',e,e.message,e.stack)}}}
 sync(err_print(function(){
@@ -50,34 +52,40 @@ var rc = eval(fs.readFileSync(process.env.HOME+'/.tagtime_rc')+'')
 if (rc.period < 45*60) print('WARNING: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:'+rc.period+')')
 if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) print('WARNING: seeds should probably be (1) positive (2) not too close to each other (3) not too big (seed:'+rc.seed+')')
 
-//===--------------------------------------------===// hacky hacky beeminder api //===--------------------------------------------===//
+//===--------------------------------------------===// less hacky hacky partial beeminder api //===--------------------------------------------===//
 
-	var http = require('http')
-	var https = require('https')
-	function request(path,query,headers,cb,base){
-		var t = path.match(/^([A-Z]+) (.*)$/); var method = t? t[1] : 'GET'; path = t? t[2] : path
-		path = path.indexOf(base) === 0? path : base+path
-		t = path.match(/^(https?):\/\/(.*)$/); var http_ = t[1] === 'http'? http : https; path = t[2]
-		t = path.match(/^(.*?)(\/.*)$/); var host = t[1]; path = t[2]
-		query = seq(query).map(function(v){return v[0]+'='+v[1]}).join('&')
-		path = path+(query===''?'':'?'+query)
-		http_.request({host:host,path:path,headers:headers,method:method},function(response){
-			var r = []; response.on('data', function(chunk){r.push(chunk)}); response.on('end', function(){
-				r = r.join('')
-				//var t = ['---','fetched',pad_left(Math.round(r.length/1024)+'kb',' ',5),'---','from',host,'---']; var u = response.headers['x-ratelimit-remaining']; if (u) t.push('limit-remaining',u,'---'); print(t.join(' '))
-				try {r = JSON.parse(r)}
-				catch (e) {}
-				//f(r,response) }) }).end()}
-				cb(null,r) }) }).end()}
-	function beeminder(path,query,cb){request(path,merge_o({auth_token:rc.auth.beeminder},query),{},cb,'https://www.beeminder.com/api/v1')}
-
-	function beeminder_get(slug,cb){beeminder('/users/me/goals/'+slug+'/datapoints.json',{},cb)}
-	function beeminder_create(slug,v,cb){beeminder('POST /users/me/goals/'+slug+'/datapoints/create_all.json',{datapoints:JSON.stringify(v instanceof Array? v : [v])},cb||function(e,v){print('beeminder_create returned:',v)})}
-	function beeminder_delete(slug,id,cb){beeminder('DELETE /users/me/goals/'+slug+'/datapoints/'+id+'.json',{},cb||function(e,v){print('beeminder_delete returned:',v)})}
-	function beeminder_update(slug,id,query,cb){beeminder('PUT /users/me/goals/'+slug+'/datapoints/'+id+'.json',query,cb||function(e,v){print('beeminder_update returned:',v)})}
+var http = require('http')
+var https = require('https')
+var request = function(method,path,query,headers,cb){
+	var t = path.match(/^(https?):\/\/(.*)$/); var http_ = t[1] === 'http'? http : https; path = t[2]
+	var t = path.match(/^(.*?)(\/.*)$/); var host = t[1]; path = t[2]
+	query = seq(query).map(function(v){return v[0]+'='+v[1]}).join('&')
+	path = path+(query===''?'':'?'+query)
+	http_.request({host:host,path:path,headers:headers,method:method},function(resp){
+		var t = []; resp.on('data', function(chunk){t.push(chunk)}); resp.on('end', function(){
+			t = t.join('')
+			var err=null; var json; try {json = JSON.parse(t)} catch (e) {err = e}
+			cb(err,{json:json,string:t,response:resp}) }) }).end() }
+var beeminder_a = function(v){var a = arguments; var cb = a[a.length-1]; var arg = a.length > 2? a[1] : undefined
+	var base = 'https://www.beeminder.com/api/v1/'
+	var auth = {auth_token:rc.auth.beeminder}
+	var ug = v.match(/^(.+)\/(.+)$/)
+	var ugd = v.match(/^(.+)\/(.+)\.datapoints$/)
+	var ugdc = v.match(/^(.+)\/(.+)\.datapoints ~=$/)
+	var ugdu = v.match(/^(.+)\/(.+)\.datapoints\[(.+)\] =$/)
+	if (!ug) request('GET',base+'users/'+v+'.json',auth,{},cb)
+	else if (ugd) request('GET',base+'users/'+ugd[1]+'/goals/'+ugd[2]+'/datapoints.json',auth,{},cb)
+	else if (ugdc) request('POST',base+'users/'+ugdc[1]+'/goals/'+ugdc[2]+'/datapoints/create_all.json',merge_o(auth,{datapoints:JSON.stringify(arg)}),{},cb)
+	else if (ugdu && arg) request('PUT',base+'users/'+ugdu[1]+'/goals/'+ugdu[2]+'/datapoints/'+ugdu[3]+'.json',merge_o(auth,arg),{},cb)
+	else if (ugdu && !arg) request('DELETE',base+'users/'+ugdu[1]+'/goals/'+ugdu[2]+'/datapoints/'+ugdu[3]+'.json',auth,{},cb)
+	else request('GET',base+'users/'+ug[1]+'/goals/'+ug[2]+'.json',auth,{},cb)
+	}
+var beeminder = function(){return beeminder_a.sync.apply(beeminder_a,[null].concat(Array.prototype.slice.apply(arguments)))}
 
 //===--------------------------------------------===// util //===--------------------------------------------===//
 
+var f0 = function(f){return function(v){return f(v)}}
+var i = f0(parseInt)
 var err = function(v){throw Error(v)}
 var pluralize = function(n,noun){return n+' '+noun+(n==1?'':'s')}
 var bind = function(o,f){return o[f].bind(o)}
@@ -105,7 +113,7 @@ var m = require_moment()
 
 var ttlog = (function(){
 	var file = rc.log_file || rc.user+'.log'
-	var parse = function(v){var t = v.match(/^(\d+)([^\[(]+)/); return [parseInt(t[1]),t[2].trim()]}
+	var parse = function(v){var t = v.match(/^(\d+)([^\[(]+)/); return [i(t[1]),t[2].trim()]}
 	var stringify = function(time,tags){
 		function lrjust(l,a,b){if ((a+' '+b).length <= l) return a+' '+' '.repeat(l-(a+' '+b).length)+b}
 		var r = time+' '+tags
@@ -224,9 +232,9 @@ function update_graphs(){
 	// reads a log file into standard graph format {date:{pings:[ping],id:}}
 	function read_log_file(){var r = {}; ttlog.all().map(function(v){var t; (r[t=m(v[0]).startOf('d')+0] = r[t] || {pings:[]}).pings.push(v[1])}); return r}
 	// reads a graph from the beeminder api into standard graph format {date:{pings:[ping],id:}}
-	function read_graph(user,slug){
+	function read_graph(user_slug){
 		var r = {}
-		beeminder_get.sync(null,slug).map(function(v){
+		beeminder(user_slug+'.datapoints').map(function(v){
 			var time = m(v.timestamp).startOf('d')+0
 			var pings = v.comment.match(/pings?:(.*)/)[1].trim().split(', ')
 			var t = {pings:pings,id:v.id}
@@ -237,28 +245,29 @@ function update_graphs(){
 	Object.keys(rc.beeminder).map(function(user_slug){
 		print(divider(' sending your tagtime data to bmndr/'+user_slug+' '))
 		var t = user_slug.match(/^(.*)\/(.*)$/); var user = t[1]; var slug = t[2]
-		var graph = read_graph(user,slug)
+		var graph = read_graph(user_slug)
 		var new_graph = read_log_file()
 		Object.keys(new_graph).map(function(k){var v; (v=new_graph[k]).pings = v.pings.filter(function(v){return v.split(' ').filter(function(v){return v===rc.beeminder[user_slug]}).length>0})})
-		var t = Object.keys(new_graph).map(function(v){return parseInt(v)}).sort_n(); var start = m(t[0]).add('d',-1)+0; var end = m(t.slice(-1)[0]).add('d',2)+0
+		var t = Object.keys(new_graph).map(i).sort_n(); var start = m(t[0]).add('d',-1)+0; var end = m(t.slice(-1)[0]).add('d',2)+0
 		for (var time = start; time < end; time = m(time).add('d',1)+0) {
 			var id = (graph[time]||{}).id
 			var pings_old = (graph[time]    ||{}).pings||[]; var ol = pings_old.length; var o = pings_old.join(', ')
 			var pings_new = (new_graph[time]||{}).pings||[]; var nl = pings_new.length; var n = pings_new.join(', ')
-			var v = {timestamp:time, value:nl*rc.period/3600, comment:pluralize(nl,'ping')+': '+n}
+			//! var v = {timestamp:time, value:nl*rc.period/3600, comment:pluralize(nl,'ping')+': '+n}
+			var v = {timestamp:m(time).hour(12)+0, value:nl*rc.period/3600, comment:pluralize(nl,'ping')+': '+n}
 			//! oh dear that is not good; pings should log how much they're worth
 			if (ol===nl && o===n) { // no change to the datapoint on this day
-			} else if (id===undefined && nl > 0) { // no such datapoint on beeminder: CREATE
+			} else if (ol===0 && nl > 0) { // no such datapoint on beeminder: CREATE
 				print('creating datapoint',v.value,v.comment)
-				print(beeminder_create.sync(null,slug,v))
+				print(beeminder(user_slug+'.datapoints ~=',[v]))
 			} else if (ol > 0 && nl===0) { // on beeminder but not in tagtime log: DELETE
 				print('deleting datapoint',id)
-				print(beeminder_delete.sync(null,slug,id))
+				print(beeminder(user_slug+'.datapoints['+id+'] ='))
 			} else if (ol!==nl || o!==n) { // bmndr & tagtime log differ: UPDATE
 				print('updating datapoint (old/new):')
 				print('[bID:'+id+']')
 				print(m(time).format(),'',v.value,v.comment)
-				print(beeminder_update.sync(null,slug,id,v))
+				print(beeminder(user_slug+'.datapoints['+id+'] =',v))
 			} else {
 				print("ERROR: can't tell what to do with this datapoint (old/new):")
 				print('[bID:'+id+']')
@@ -272,7 +281,7 @@ function update_graphs(){
 if (!module.parent) {
 	var v = process.argv.slice(2)
 	if (v.length===0) main()
-	else if (v.length===2 && v[0]==='ping_process') ping_process(parseInt(v[1]))
+	else if (v.length===2 && v[0]==='ping_process') ping_process(i(v[1]))
 	else if (v[0]==='e') print(eval(v.slice(1).join(' ')))
 	else print('usage: ./tagtime.js')
 	}
