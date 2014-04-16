@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 var fs = require('fs')
+var util = require('util')
 var sync = require('sync')
 //var L = require('lazy.js')
 var exec = require('child_process').exec
@@ -20,7 +21,7 @@ var exec = require('child_process').exec
 // //! comments
 // actually should be cool with goal formats like 31 0.75 "TagTime ping: bee spt" 31 0.75 "TagTime ping: bee spt"
 // maybe refactor ping algorithm *again* to avoid maintaining state
-// so the log entries fail to record both (1) ping frequency and (2) time zone . this is somewhat problematic.
+// so the log entries now record ping period and timezone but the code doesn't quite use it, and most of our ping log has the wrong timezone
 // refactor things to be less synchronous
 
 var err_print = function(f){return function(){try{f()} catch (e) {print('error!',e,e.message,e.stack)}}}
@@ -69,6 +70,7 @@ var request = function(method,path,query,headers,cb){
 var beeminder_a = function(v){var a = arguments; var cb = a[a.length-1]; var arg = a.length > 2? a[1] : undefined
 	var base = 'https://www.beeminder.com/api/v1/'
 	var auth = {auth_token:rc.auth.beeminder}
+	var t = cb; var cb = function(err,v){t(err, err? v : v.json)}
 	var ug = v.match(/^(.+)\/(.+)$/)
 	var ugd = v.match(/^(.+)\/(.+)\.datapoints$/)
 	var ugdc = v.match(/^(.+)\/(.+)\.datapoints ~=$/)
@@ -112,16 +114,13 @@ var m = require_moment()
 //===--------------------------------------------===// log file api //===--------------------------------------------===//
 
 var ttlog = (function(){
+	var isoFormat = 'YYYY-MM-DDTHH:mm:ssZ'
 	var file = rc.log_file || rc.user+'.log'
-	var parse = function(v){var t = v.match(/^(\d+)([^\[(]+)/); return [i(t[1]),t[2].trim()]}
-	var stringify = function(time,tags){
-		function lrjust(l,a,b){if ((a+' '+b).length <= l) return a+' '+' '.repeat(l-(a+' '+b).length)+b}
-		var r = time+' '+tags
-		return ['YYYY-MM-DD/HH:mm:ss ddd','YYYY-MM-DD/HH:mm:ss','MM-DD/HH:mm:ss','DD/HH:mm:ss','HH:mm:ss','HH:mm'
-			].map(bind(m(time),'format')).map(function(t){return lrjust(79,r,'['+t+']')}).filter(function(v){return v})[0] || r }
+	var parse = function(v){var t = eval('['+v+']'); return {day:m(t[0].slice(0,'YYYY-MM-DD'.length)), time:m(t[0]), period:t[1], tags:t[2]}}
+	var stringify = function(v){return util.inspect([v.time.format(isoFormat),v.period,v.tags]).replace(/\n */g,' ').slice(2,-2)}
 	return {
 		last: function(){var t; return (t=read_lines(file).filter(function(v){return v!==''}).slice(-1)[0])? parse(t) : undefined},
-		append: function(time,tags){var r; fs.appendFileSync(file,(r=stringify(time,tags))+'\n'); return r},
+		append: function(v){fs.appendFileSync(file,'\n'+stringify(v))},
 		all: function(){return read_lines(file).filter(function(v){return v!==''}).map(parse)}
 	} })()
 
@@ -182,20 +181,21 @@ var pings = (function(){
 function main(){
 	var n; var t; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=pings.lt(n))),'ago, at',m(t).format('HH:mm:ss'))
 
-	var start = now()
+	var first
 	var count = 0
 	var lock = false // ugly hack
 	setInterval(function(){sync(function(){
 		if (lock) return; lock = true
-		var t; var time = (t=ttlog.last())? pings.le(t[0]) : pings.lt(now())
+		var t; var time = (t=ttlog.last())? pings.le(t.time+0) : pings.lt(now())
+		first = first || time
 		while(true) {
 			var last = time; time = pings.gt(time)
 			if (!(time <= now())) break
 
-			print((++count)+': PING!',m(time).format('YYYY-MM-DD/HH:mm:ss'),'gap',format_dur(time-last),'','avg',format_dur((time-start)/count),'tot',format_dur(time-start))
+			print((++count)+': PING!',m(time).format('YYYY-MM-DD/HH:mm:ss'),'gap',format_dur(time-last),'','avg',format_dur((time-first)/count),'tot',format_dur(time-first))
 
 			if (time < now()-rc.retro_threshold)
-				ttlog.append(time,'afk RETRO')
+				ttlog.append({time:m(time), period:rc.period/3600, tags:'afk RETRO'})
 			else
 				ping(time)
 			}
@@ -217,11 +217,12 @@ function ping_process(time){
 		print(divider(''))
 		print()
 		}
-	var last_doing = ttlog.last()[1]
+	var last_doing = ttlog.last().tags
 	print("It's tag time! What are you doing RIGHT NOW ("+m(time).format('HH:mm:ss')+')?')
 	print('Ditto ('+cyan('"')+') to repeat prev tags:',cyan(last_doing))
 	var t = read_line_stdin().trim()
-	t = ttlog.append(time,t==='"'? last_doing : t)
+	t = ttlog.append({time:m(time), period:rc.period/3600, tags:t==='"'? last_doing : t})
+
 	print(green(t))
 	update_graphs()
 	process.exit()
@@ -229,14 +230,17 @@ function ping_process(time){
 
 // updates beeminder graphs
 function update_graphs(){
+	//! timezone and value
+
 	// reads a log file into standard graph format {date:{pings:[ping],id:}}
-	function read_log_file(){var r = {}; ttlog.all().map(function(v){var t; (r[t=m(v[0]).startOf('d')+0] = r[t] || {pings:[]}).pings.push(v[1])}); return r}
+	function read_log_file(){var r = {}; ttlog.all().map(function(v){(r[v.day+0] = r[v.day+0] || {pings:[]}).pings.push(v)}); return r}
 	// reads a graph from the beeminder api into standard graph format {date:{pings:[ping],id:}}
 	function read_graph(user_slug){
 		var r = {}
 		beeminder(user_slug+'.datapoints').map(function(v){
-			var time = m(v.timestamp).startOf('d')+0
-			var pings = v.comment.match(/pings?:(.*)/)[1].trim().split(', ')
+			//! value
+			var time = m(v.timestamp).startOf('d')+0 //! timezone
+			var pings = v.comment.match(/pings?:(.*)/)[1].trim().split(', ').map(function(v){return {tags:v}})
 			var t = {pings:pings,id:v.id}
 			if (r[time]) print('multiple datapoints in a day',r[time],t)
 			r[time] = t})
@@ -247,12 +251,12 @@ function update_graphs(){
 		var t = user_slug.match(/^(.*)\/(.*)$/); var user = t[1]; var slug = t[2]
 		var graph = read_graph(user_slug)
 		var new_graph = read_log_file()
-		Object.keys(new_graph).map(function(k){var v; (v=new_graph[k]).pings = v.pings.filter(function(v){return v.split(' ').filter(function(v){return v===rc.beeminder[user_slug]}).length>0})})
+		Object.keys(new_graph).map(function(k){var v; (v=new_graph[k]).pings = v.pings.filter(function(v){return v.tags.split(' ').filter(function(v){return v===rc.beeminder[user_slug]}).length>0})})
 		var t = Object.keys(new_graph).map(i).sort_n(); var start = m(t[0]).add('d',-1)+0; var end = m(t.slice(-1)[0]).add('d',2)+0
 		for (var time = start; time < end; time = m(time).add('d',1)+0) {
 			var id = (graph[time]||{}).id
-			var pings_old = (graph[time]    ||{}).pings||[]; var ol = pings_old.length; var o = pings_old.join(', ')
-			var pings_new = (new_graph[time]||{}).pings||[]; var nl = pings_new.length; var n = pings_new.join(', ')
+			var pings_old = (graph[time]    ||{}).pings||[]; var ol = pings_old.length; var o = pings_old.map(function(v){return v.tags}).join(', ')
+			var pings_new = (new_graph[time]||{}).pings||[]; var nl = pings_new.length; var n = pings_new.map(function(v){return v.tags}).join(', ')
 			//! var v = {timestamp:time, value:nl*rc.period/3600, comment:pluralize(nl,'ping')+': '+n}
 			var v = {timestamp:m(time).hour(12)+0, value:nl*rc.period/3600, comment:pluralize(nl,'ping')+': '+n}
 			//! oh dear that is not good; pings should log how much they're worth
