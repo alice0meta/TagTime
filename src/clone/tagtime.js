@@ -46,14 +46,14 @@ sync(err_print(function(){
 	//////////////////  END COPIED SECTION  /////////////////
 	/////////////////////////////////////////////////////////
 
-//===--------------------------------------------===// load rc file //===--------------------------------------------===//
+//===-----------------------===// load rc file //===-----------------------===//
 
 var rc = eval(fs.readFileSync(process.env.HOME+'/.tagtime_rc')+'')
 
 if (rc.period < 45*60) print('WARNING: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:'+rc.period+')')
 if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) print('WARNING: seeds should probably be (1) positive (2) not too close to each other (3) not too big (seed:'+rc.seed+')')
 
-//===--------------------------------------------===// less hacky hacky partial beeminder api //===--------------------------------------------===//
+//===----------===// less hacky hacky partial beeminder api //===----------===//
 
 var http = require('http')
 var https = require('https')
@@ -84,7 +84,7 @@ var beeminder_a = function(v){var a = arguments; var cb = a[a.length-1]; var arg
 	}
 var beeminder = function(){return beeminder_a.sync.apply(beeminder_a,[null].concat(Array.prototype.slice.apply(arguments)))}
 
-//===--------------------------------------------===// util //===--------------------------------------------===//
+//===---------------------------===// util //===---------------------------===//
 
 var f0 = function(f){return function(v){return f(v)}}
 var i = f0(parseInt)
@@ -107,11 +107,14 @@ var require_moment = function(){
 	return r}
 var read_line_stdin = function(){return (function(cb){process.stdin.on('readable', function(){var t; if ((t=process.stdin.read())!==null) cb(undefined,t+'')})}).sync()}
 var cyan  = function(v){return '\x1b[36;1m'+v+'\x1b[0m'}
-var green = function(v){return '\x1b[32;1m'+v+'\x1b[0m'}
 
 var m = require_moment()
 
-//===--------------------------------------------===// log file api //===--------------------------------------------===//
+//===-----------------------===// log file api //===-----------------------===//
+
+// dreeves has strong opinions about this and wants the log format:
+// 2014-03-26T19:51:56-07:00F22.5 a b c (a:blah)
+// 2014-03-26/19:51:56-07:00f22.5 a b c (a:blah)
 
 var ttlog = (function(){
 	var isoFormat = 'YYYY-MM-DDTHH:mm:ssZ'
@@ -124,7 +127,7 @@ var ttlog = (function(){
 		all: function(){return read_lines(file).filter(function(v){return v!==''}).map(parse)}
 	} })()
 
-//===--------------------------------------------===// ping algorithm //===--------------------------------------------===//
+//===----------------------===// ping algorithm //===----------------------===//
 
 var pings = (function(){
 	// utils
@@ -175,7 +178,7 @@ var pings = (function(){
 		ge: function(time){while (get() >= time) prev(); while (get() <  time) next(); return get()}
 	} })()
 
-//===-----------------===// functions loosely corresponding to the original tagtime architecture //===-----------------===//
+//===--===// fns loosely corresponding to the original architecture //===--===//
 
 // beeps at appropriate times and opens ping windows
 function main(){
@@ -220,10 +223,8 @@ function ping_process(time){
 	var last_doing = ttlog.last().tags
 	print("It's tag time! What are you doing RIGHT NOW ("+m(time).format('HH:mm:ss')+')?')
 	print('Ditto ('+cyan('"')+') to repeat prev tags:',cyan(last_doing))
-	var t = read_line_stdin().trim()
-	t = ttlog.append({time:m(time), period:rc.period/3600, tags:t==='"'? last_doing : t})
-
-	print(green(t))
+	var t; var tags = (t=read_line_stdin().trim())==='"'? last_doing : t
+	ttlog.append({time:m(time), period:rc.period/3600, tags:tags})
 	update_graphs()
 	process.exit()
 	}
@@ -280,7 +281,7 @@ function update_graphs(){
 		}
 	}) }
 
-//===--------------------------------------------===// choose from argv //===--------------------------------------------===//
+//===---------------------===// choose from argv //===---------------------===//
 
 if (!module.parent) {
 	var v = process.argv.slice(2)
@@ -290,6 +291,6 @@ if (!module.parent) {
 	else print('usage: ./tagtime.js')
 	}
 
-//===--------------------------------------------===// <end> //===--------------------------------------------===//
+//===---------------------------===// <end> //===--------------------------===//
 
 }))

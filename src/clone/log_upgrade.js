@@ -76,20 +76,24 @@ var ttlog = (function(){
 	return {
 		last: function(){var t; return (t=read_lines(file).filter(function(v){return v!==''}).slice(-1)[0])? parse(t) : undefined},
 		append: function(time,tags){var r; fs.appendFileSync(file,(r=stringify(time,tags))+'\n'); return r},
-		all: function(){return read_lines(file).filter(function(v){return v!==''}).map(parse)}
+		all: function(){return read_lines(file).filter(function(v){return v!==''}).map(parse)},
+		set: function(v){file = v; return ttlog}
 	} })()
 
 //===--------------------------------------------===// log_upgrade //===--------------------------------------------===//
 
-function main(out){fs.writeFileSync(out||rc.log_file||rc.user+'.log',ttlog.all().map(function(v){return [m(v[0]).format('YYYY-MM-DDTHH:mm:ssZ'),rc.period/3600,v[1]]}).map(function(v){return util.inspect(v).replace(/\n */g,' ').slice(2,-2)}).join('\n'))}
+function main(in_,out){fs.writeFileSync(out,ttlog.set(in_).all().map(function(v){return [m(v[0]).format('YYYY-MM-DDTHH:mm:ssZ'),rc.period/3600,v[1]]}).map(function(v){return util.inspect(v).replace(/\n */g,' ').slice(2,-2)}).join('\n'))}
 
 //===--------------------------------------------===// choose from argv //===--------------------------------------------===//
 
 if (!module.parent) {
+	var logf = rc.log_file || rc.user+'.log'
 	var v = process.argv.slice(2)
-	if (v.length<=1) main(v[0])
-	else if (v[0]==='e') print(eval(v.slice(1).join(' ')))
-	else print('usage: ./log_upgrade.js <out-file>?')
+	if (v[0]==='e') print(eval(v.slice(1).join(' ')))
+	else if (v.length===0) main(logf,logf)
+	else if (v.length===1) main(logf,v[0])
+	else if (v.length===2) main(v[0],v[1])
+	else print('usage: ./log_upgrade.js (<in-file>? <out-file>)?')
 	}
 
 //===--------------------------------------------===// <end> //===--------------------------------------------===//
