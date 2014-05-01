@@ -31,7 +31,9 @@ sync(err_print(function(){
 
 //===--------------------------------------------===// load rc file //===--------------------------------------------===//
 
-var rc = eval(fs.readFileSync(process.env.HOME+'/.tagtime_rc')+'')
+var ttdir = process.env.HOME+'/.tagtime/'
+
+var rc = eval(fs.readFileSync(ttdir+'settings.js')+'')
 
 if (rc.period < 45*60) print('WARNING: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:'+rc.period+')')
 if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) print('WARNING: seeds should probably be (1) positive (2) not too close to each other (3) not too big (seed:'+rc.seed+')')
@@ -66,7 +68,7 @@ var m = require_moment()
 //===--------------------------------------------===// log file api //===--------------------------------------------===//
 
 var ttlog = (function(){
-	var file = rc.log_file || rc.user+'.log'
+	var file
 	var parse = function(v){var t = v.match(/^(\d+)([^\[]+)/); return [i(t[1]),t[2].trim()]}
 	var stringify = function(time,tags){
 		function lrjust(l,a,b){if ((a+' '+b).length <= l) return a+' '+' '.repeat(l-(a+' '+b).length)+b}
@@ -87,12 +89,12 @@ function main(in_,out){fs.writeFileSync(out,ttlog.set(in_).all().map(function(v)
 //===--------------------------------------------===// choose from argv //===--------------------------------------------===//
 
 if (!module.parent) {
-	var logf = rc.log_file || rc.user+'.log'
+	var logf = rc.log_file || ttdir+rc.user+'.log'
 	var v = process.argv.slice(2)
 	if (v[0]==='e') print(eval(v.slice(1).join(' ')))
 	else if (v.length===0) main(logf,logf)
-	else if (v.length===1) main(logf,v[0])
-	else if (v.length===2) main(v[0],v[1])
+	else if (v.length===1) main(logf,ttdir+v[0])
+	else if (v.length===2) main(ttdir+v[0],ttdir+v[1])
 	else print('usage: ./log_upgrade.js (<in-file>? <out-file>)?')
 	}
 

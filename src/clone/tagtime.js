@@ -48,7 +48,9 @@ sync(err_print(function(){
 
 //===-----------------------===// load rc file //===-----------------------===//
 
-var rc = eval(fs.readFileSync(process.env.HOME+'/.tagtime_rc')+'')
+var ttdir = process.env.HOME+'/.tagtime/'
+
+var rc = eval(fs.readFileSync(ttdir+'settings.js')+'')
 
 if (rc.period < 45*60) print('WARNING: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:'+rc.period+')')
 if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) print('WARNING: seeds should probably be (1) positive (2) not too close to each other (3) not too big (seed:'+rc.seed+')')
@@ -118,7 +120,7 @@ var m = require_moment()
 
 var ttlog = (function(){
 	var isoFormat = 'YYYY-MM-DDTHH:mm:ssZ'
-	var file = rc.log_file || rc.user+'.log'
+	var file = rc.log_file || ttdir+rc.user+'.log'
 	var parse = function(v){var t = eval('['+v+']'); return {day:m(t[0].slice(0,'YYYY-MM-DD'.length)), time:m(t[0]), period:t[1], tags:t[2]}}
 	var stringify = function(v){return util.inspect([v.time.format(isoFormat),v.period,v.tags]).replace(/\n */g,' ').slice(2,-2)}
 	return {
@@ -286,6 +288,7 @@ function update_graphs(){
 if (!module.parent) {
 	var v = process.argv.slice(2)
 	if (v.length===0) main()
+	else if (v.length===1 && v[0]==='update-graphs') update_graphs()
 	else if (v.length===2 && v[0]==='ping_process') ping_process(i(v[1]))
 	else if (v[0]==='e') print(eval(v.slice(1).join(' ')))
 	else print('usage: ./tagtime.js')
