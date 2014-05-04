@@ -1,30 +1,21 @@
-({
-	user: "", // CHANGEME to your username
-	auth: {beeminder: "xxxxxxxxxxxxxxxxxxxx"}, // Get your personal Beeminder auth token (after signing in) from https://www.beeminder.com/api/v1/auth_token.json
-	// CHANGEME by adding entries for each beeminder graph you want to auto-update:
+{
+	auth: {beeminder: "xxxxxxxxxxxxxxxxxxxx"}, // get your auth token from https://www.beeminder.com/api/v1/auth_token.json when signed in
 	beeminder: {
-		//"alice/work": "job",  # all "job" pings get added to bmndr.com/alice/work
-		//"bob/play": ["fun","whee"], # pings w/ "fun" and/or "whee" sent to bob/play
+		// CHANGEME by adding entries for each beeminder graph you want to auto-update
+		// 'alice/work': 'job',                          // send 'job' pings to bmndr.com/alice/work
+		// 'bob/play': 'fun and whee',                   // send 'fun whee' pings to bmndr.com/bob/play
+		// 'bob/play': 'fun or whee',                    // send 'fun' pings and 'whee' pings to bmndr.com/bob/play
+		// 'carol/nafk': 'not afk',                      // send pings that are not 'afk' pings to bmndr.com/carol/nafk
+		// 'dave/socialgood': 'friends and not akrasia', // send 'friends' pings that are not 'akrasia' to bmndr.com/dave/socialgood
+	'':''},
+	retro_threshold: 60, // pings from more than this many seconds ago get autologged with tags "afk" and "RETRO". (Pings can be overdue either because the computer was off or tagtime was waiting for you to answer a previous ping. If the computer was off, the tag "off" is also added.)
+	catchup: false, // whether it beeps for old pings, ie, should it beep a bunch of times in a row when the computer wakes from sleep.
 
-		// ADVANCED USAGE: regular expressions
-		// pings tagged like "eat1", "eat2", "eat3" get added to carol/food:
-		//"carol/food": qr/\beat\d+\b/,
+	period: 45, // average number of minutes between pings
+	seed: 666, // for pings not in sync with others, change this
 
-		// ADVANCED USAGE: plug-in functions
-		// pings tagged anything except "afk" get added to "dan/nafk":
-		//"dan/nafk": sub { return shift() !~ /\bafk\b/; }
-		// pings tagged "workout" get added to dave/tueworkouts, but only on tuesdays:
-		//"dave/tueworkouts": sub { my @now = localtime();
-		// return shift() =~/\bworkout\b/ && $now[6] == 2;
-		//}
-	},
-	retro_threshold: 60, // Pings from more than this many seconds ago get autologged with tags "afk" and "RETRO". (Pings can be overdue either because the computer was off or tagtime was waiting for you to answer a previous ping. If the computer was off, the tag "off" is also added.)
-
-	period: 45*60, // Average number of seconds between pings (eg, 60*60 = 1 hour)
-	seed: 666, // For pings not in sync with others, change this
-
-	log_file: '', // log file for pings
+	ping_file: 'pings.log', // file pings output to
 	editor: '', // "CHANGEME if you don't like vi (eg: /usr/bin/pico)"
 	terminal: '', // "CHANGEME to your path to xterm"
-	enforce_nums: false // Whether it forces you to include a number in your ping response (include tag non or nonXX where XX is day  of month to override). This is for task editor integration.
-})
+	enforce_nums: false, // whether it forces you to include a number in your ping response (include tag non or nonXX where XX is day  of month to override). This is for task editor integration.
+'':''}
