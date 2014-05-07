@@ -20,8 +20,12 @@ var exec = require('child_process').exec
 // //! comments
 // actually should be cool with goal formats like 31 0.75 "TagTime ping: bee spt" 31 0.75 "TagTime ping: bee spt"
 // maybe refactor ping algorithm *again* to avoid maintaining state
-// so the log entries now record ping period and timezone but the code doesn't quite use it, and most of our ping log has the wrong timezone
+// so the log entries now record ping period and timezone but the code doesn't quite use it,
 // refactor things to be less synchronous
+// tagtime bug:
+//		/c/Users/zii/ali/code/github/TagTime/src/clone>tagtime.js
+//		TagTime is watching you! Last ping would've been 36m20s ago, at 18:16:17
+//		1: PING! 2014-04-17/18:16:17 gap 41m19s  avg 41m19s tot 41m19s
 
 var err_print = function(f){return function(){try{f()} catch (e) {console.log('error!',e,e.message,e.stack)}}}
 sync(err_print(function(){
@@ -94,8 +98,6 @@ var f0 = function(f){return function(v){return f(v)}}
 var i = f0(parseInt)
 var err = function(v){throw Error(v)}
 var pluralize = function(n,noun){return n+' '+noun+(n==1?'':'s')}
-var bind = function(o,f){return o[f].bind(o)}
-var def_get_proto = function(o,m,f){Object.defineProperty(o.prototype,m,{get:f})}
 var read_lines = function(fl){return (fs.readFileSync(fl)+'').split('\n')}
 var read_nonblank_lines = function(fl){return read_lines(fl).filter(function(v){return v!==''})}
 Array.prototype.sort_n = function(){return this.sort(function(a,b){return a-b})}
@@ -111,18 +113,18 @@ var require_moment = function(){
 	for (var v in old) if (old.hasOwnProperty(v)) r[v] = old[v]
 	return r}
 var read_line_stdin = function(){return (function(cb){process.stdin.on('readable', function(){var t; if ((t=process.stdin.read())!==null) cb(undefined,t+'')})}).sync()}
-var cyan  = function(v){return '\x1b[36;1m'+v+'\x1b[0m'}
+var cyan = function(v){return '\x1b[36;1m'+v+'\x1b[0m'}
 
 var m = require_moment()
 
 //===-------------===// ping file parser and stringifier //===-------------===//
 
 var ping = (function(){
-	// log format is: 2014-03-26/19:51:56-07:00f22.5 a b c (a:blah)
+	// log format is: 2014-03-26/19:51:56-07:00p22.5 a b c (a:blah)
 	var format = 'YYYY-MM-DD/HH:mm:ssZ'
 	var parse = function(v){var t = v.match(/^((....-..-..)[^\s\d]..:..:..[-+]..:..)(?:[^\s\d]([\d.]+))? (.*)$/); return {day:m(t[2]), time:m(t[1],format), period:(t[3]? parseFloat(t[3]) : 45)*60, tags:t[4]}}
 	var parse_old = function(v){var t = v.match(/^(\d+)([^\[]+)/); return {time:m(parseInt(t[1])), tags:t[2].trim(), period:rc.period*60}}
-	var stringify = function(v){return v.time.format(format)+(v.period===45*60?'':'f'+(v.period/60))+' '+v.tags}
+	var stringify = function(v){return v.time.format(format)+(v.period===45*60?'':'p'+(v.period/60))+' '+v.tags}
 	return {
 		last: function(fl){var t; return (t=read_nonblank_lines(fl).slice(-1)[0])? parse(t) : undefined},
 		append: function(fl,v){fs.appendFileSync(fl,'\n'+stringify(v))},
@@ -171,7 +173,7 @@ var pings = (function(){
 	var prev = function(){prev_s(seqs.max_by(function(v){return v.ping - interval(v.seed,v.i-1)}))}
 
 	if (Math.ceil(seq_count)===1 && rc.seed===666) {seqs = [{seed:rc.seed, i:78922, ping:1397086515}]; prev()} // optimization: a recent seqs
-	else seqs = range(Math.ceil(seq_count)).map(function(v){return next_s({seed:rc.seed+v, i:0, ping:1184083200})}) // the birth of timepie/tagtime!
+	else {seqs = range(Math.ceil(seq_count)).map(function(v){return {seed:rc.seed+v, i:0, ping:1184083200}}); seqs = seqs.map(next_s)} // the birth of timepie/tagtime!
 
 	return {
 		// time → nearest ping time < ≤ > ≥ time
@@ -233,19 +235,23 @@ function ping_process(time){
 	}
 
 // updates beeminder graphs
-function update_graphs(){
+function update_graphs(dry_run){
 	//! timezone and value
 
-	// reads a log file into standard graph format {date:{pings:[ping],id:}}
+	// a log file → {date:{pings:[ping]}}
 	function read_log_file(){var r = {}; ping.all(pingf).map(function(v){(r[v.day+0] = r[v.day+0] || {pings:[]}).pings.push(v)}); return r}
-	// reads a graph from the beeminder api into standard graph format {date:{pings:[ping],id:}}
+	// a graph from the beeminder api → {date:{pings:[ping],id:}}
 	function read_graph(user_slug){
 		var r = {}
-		beeminder(user_slug+'.datapoints').map(function(v){
+		beeminder(user_slug+'.datapoints').filter(function(v){return v.value!==0}).map(function(v){
+			//print(v.value,'dsds',typeof v.comment,v.comment)
 			//! value
 			var time = m(v.timestamp).startOf('d')+0 //! timezone
 			var pings = v.comment.match(/pings?:(.*)/)[1].trim().split(', ').map(function(v){return {tags:v}})
-			var t = {pings:pings,id:v.id}
+
+			//r[time] = r[time] || {pings:[],ids:[]}
+			var t = {pings:pings,ids:v.id}
+
 			if (r[time]) print('multiple datapoints in a day',r[time],t)
 			r[time] = t})
 		return r}
@@ -278,15 +284,15 @@ function update_graphs(){
 			if (ol===nl && o===n) { // no change to the datapoint on this day
 			} else if (ol===0 && nl > 0) { // no such datapoint on beeminder: CREATE
 				print('creating datapoint',v.value,v.comment)
-				print(beeminder(user_slug+'.datapoints ~=',[v]))
+				if (!dry_run) print(beeminder(user_slug+'.datapoints ~=',[v]))
 			} else if (ol > 0 && nl===0) { // on beeminder but not in tagtime log: DELETE
 				print('deleting datapoint',id)
-				print(beeminder(user_slug+'.datapoints['+id+'] ='))
+				if (!dry_run) print(beeminder(user_slug+'.datapoints['+id+'] ='))
 			} else if (ol!==nl || o!==n) { // bmndr & tagtime log differ: UPDATE
 				print('updating datapoint (old/new):')
 				print('[bID:'+id+']')
 				print(m(time).format(),'',v.value,v.comment)
-				print(beeminder(user_slug+'.datapoints['+id+'] =',v))
+				if (!dry_run) print(beeminder(user_slug+'.datapoints['+id+'] =',v))
 			} else {
 				print("ERROR: can't tell what to do with this datapoint (old/new):")
 				print('[bID:'+id+']')
@@ -302,7 +308,7 @@ function import_logs(fl){((fs.readFileSync(fl)+'').match(/^....-..-..\//)? ping.
 if (!module.parent) {
 	var v = process.argv.slice(2)
 	if (v.length===0) main()
-	else if (v.length===1 && v[0]==='update-graphs') update_graphs()
+	else if (v[0]==='update-graphs') update_graphs(v[1])
 	else if (v.length===2 && v[0]==='import-logs') import_logs(v[1])
 	else if (v.length===2 && v[0]==='ping-process') ping_process(i(v[1]))
 	else if (v[0]==='e') print(eval(v.slice(1).join(' ')))
