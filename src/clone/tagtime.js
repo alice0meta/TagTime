@@ -4,6 +4,7 @@ var fs = require('fs')
 var util = require('util')
 var sync = require('sync')
 var exec = require('child_process').exec
+var m = require('moment')
 
 // todo:
 // have read_graph cache its results
@@ -18,7 +19,6 @@ var exec = require('child_process').exec
 // pings_if(): skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level (current afk behavior is undesirable in many ways)
 // pings_if(): after logging old datapoints, open the log file in an editor
 // //! comments
-// actually should be cool with goal formats like 31 0.75 "TagTime ping: bee spt" 31 0.75 "TagTime ping: bee spt"
 // maybe refactor ping algorithm *again* to avoid maintaining state
 // so the log entries now record ping period and timezone but the code doesn't quite use it,
 // refactor things to be less synchronous
@@ -104,26 +104,24 @@ Array.prototype.sort_n = function(){return this.sort(function(a,b){return a-b})}
 var divider = function(v){ // 'foo' → '-----foo-----' of length 79
 	var left = Math.floor((79 - v.length)/2), right = 79 - left - v.length
 	return '-'.repeat(left)+v+'-'.repeat(right)}
-var require_moment = function(){
-	var old = require('moment')
-	var r = function(v){
-		var r = arguments.length===1 && typeof(v)==='number'? old(v*1000) : old.apply(null,arguments)
-		r.valueOf = function(){return +this._d/1000 + ((this._offset || 0) * 60)}
-		return r}
-	for (var v in old) if (old.hasOwnProperty(v)) r[v] = old[v]
-	return r}
 var read_line_stdin = function(){return (function(cb){process.stdin.on('readable', function(){var t; if ((t=process.stdin.read())!==null) cb(undefined,t+'')})}).sync()}
 var cyan = function(v){return '\x1b[36;1m'+v+'\x1b[0m'}
 
-var m = require_moment()
-
 //===-------------===// ping file parser and stringifier //===-------------===//
-
+////////////////////////////////////////////////////
+////////////////////////////////////////////////////
+/////  CURRENT IS HERE
+////////////////////////////////////////////////////
+////////////////////////////////////////////////////
 var ping = (function(){
 	// log format is: 2014-03-26/19:51:56-07:00p22.5 a b c (a:blah)
 	var format = 'YYYY-MM-DD/HH:mm:ssZ'
-	var parse = function(v){var t = v.match(/^((....-..-..)[^\s\d]..:..:..[-+]..:..)(?:[^\s\d]([\d.]+))? (.*)$/); return {day:m(t[2]), time:m(t[1],format), period:(t[3]? parseFloat(t[3]) : 45)*60, tags:t[4]}}
-	var parse_old = function(v){var t = v.match(/^(\d+)([^\[]+)/); return {time:m(parseInt(t[1])), tags:t[2].trim(), period:rc.period*60}}
+	var parse = function(v){var t = v.match(/^((....-..-..)[^\s\d]..:..:..[-+]..:..)(?:[^\s\d]([\d.]+))? (.*)$/);
+		//! ALICE
+		//print(t[1],m(t[1],format)/1000,m.parseZone(t[1],format)/1000) //! currently thinking about this
+		//process.exit()
+		return {day:m.utc(t[2]), time:m(t[1],format), period:(t[3]? parseFloat(t[3]) : 45)*60, tags:t[4]}}
+	var parse_old = function(v){var t = v.match(/^(\d+)([^\[]+)/); return {time:m(parseInt(t[1])*1000), tags:t[2].trim(), period:rc.period*60}}
 	var stringify = function(v){return v.time.format(format)+(v.period===45*60?'':'p'+(v.period/60))+' '+v.tags}
 	return {
 		last: function(fl){var t; return (t=read_nonblank_lines(fl).slice(-1)[0])? parse(t) : undefined},
@@ -187,23 +185,23 @@ var pings = (function(){
 
 // beeps at appropriate times and opens ping windows
 function main(){
-	var n; var t; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=pings.lt(n))),'ago, at',m(t).format('HH:mm:ss'))
+	var n; var t; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=pings.lt(n))),'ago, at',m(t*1000).format('HH:mm:ss'))
 
 	var first
 	var count = 0
 	var lock = false // ugly hack
 	setInterval(function(){sync(function(){
 		if (lock) return; lock = true
-		var t; var time = (t=ping.last(pingf))? pings.le(t.time+0) : pings.lt(now())
+		var t; var time = (t=ping.last(pingf))? pings.le(t.time/1000) : pings.lt(now())
 		first = first || time
 		while(true) {
 			var last = time; time = pings.gt(time)
 			if (!(time <= now())) break
 
-			print((++count)+': PING!',m(time).format('YYYY-MM-DD/HH:mm:ss'),'gap',format_dur(time-last),'','avg',format_dur((time-first)/count),'tot',format_dur(time-first))
+			print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',format_dur(time-last),'','avg',format_dur((time-first)/count),'tot',format_dur(time-first))
 
 			if (time < now()-rc.retro_threshold)
-				ping.append(pingf,{time:m(time), period:rc.period, tags:'afk RETRO'})
+				ping.append(pingf,{time:m(time*1000), period:rc.period, tags:'afk RETRO'})
 			else
 				prompt_for_ping(time)
 			}
@@ -226,34 +224,37 @@ function ping_process(time){
 		print()
 		}
 	var last_doing = ping.last(pingf).tags
-	print("It's tag time! What are you doing RIGHT NOW ("+m(time).format('HH:mm:ss')+')?')
+	print("It's tag time! What are you doing RIGHT NOW ("+m(time*1000).format('HH:mm:ss')+')?')
 	print('Ditto ('+cyan('"')+') to repeat prev tags:',cyan(last_doing))
 	var t; var tags = (t=read_line_stdin().trim())==='"'? last_doing : t
-	ping.append(pingf,{time:m(time), period:rc.period, tags:tags})
+	ping.append(pingf,{time:m(time*1000), period:rc.period, tags:tags})
 	update_graphs()
 	process.exit()
 	}
 
 // updates beeminder graphs
 function update_graphs(dry_run){
+	// so it looks like the beeminder datapoints store literally no timezone information and record days by recording vaguely noon EDT on that day. maybe.
 	//! timezone and value
+	// okay, so read_graph's ping objects are {tags:,value:}
 
 	// a log file → {date:{pings:[ping]}}
-	function read_log_file(){var r = {}; ping.all(pingf).map(function(v){(r[v.day+0] = r[v.day+0] || {pings:[]}).pings.push(v)}); return r}
-	// a graph from the beeminder api → {date:{pings:[ping],id:}}
+	function read_log_file(){var r = {}; ping.all(pingf).map(function(v){(r[v.day/1000] = r[v.day/1000] || {pings:[]}).pings.push(v)}); return r}
+	// a graph from the beeminder api → {date:{pings:[ping],ids:[id]}}
 	function read_graph(user_slug){
 		var r = {}
 		beeminder(user_slug+'.datapoints').filter(function(v){return v.value!==0}).map(function(v){
-			//print(v.value,'dsds',typeof v.comment,v.comment)
-			//! value
-			var time = m(v.timestamp).startOf('d')+0 //! timezone
-			var pings = v.comment.match(/pings?:(.*)/)[1].trim().split(', ').map(function(v){return {tags:v}})
+			var date = m.utc(v.timestamp*1000).startOf('d')/1000
+			var pings = v.comment.match(/pings?:(.*)/)[1].trim().split(', ')
+			pings = pings.map(function(v){return {tags:v, value:v.value/pings.length}})
 
-			//r[time] = r[time] || {pings:[],ids:[]}
+			//! okay so we can have more than one of these. let's get on with having that not print error messages. and maybe also output graphs of style either "grouped" or "individual"? in respect to ping ↔ datapoint mapping. with "grouped" being grouped-by-day.
+
+			//r[date] = r[date] || {pings:[],ids:[]}
 			var t = {pings:pings,ids:v.id}
 
-			if (r[time]) print('multiple datapoints in a day',r[time],t)
-			r[time] = t})
+			if (r[date]) print('multiple datapoints in a day',r[date],t)
+			r[date] = t})
 		return r}
 
 	var tagdsl_eval = function(f,tags){
@@ -272,14 +273,15 @@ function update_graphs(dry_run){
 		var t = user_slug.match(/^(.*)\/(.*)$/); var user = t[1]; var slug = t[2]
 		var graph = read_graph(user_slug)
 		var new_graph = read_log_file()
+		process.exit()
 		Object.keys(new_graph).map(function(k){var v; (v=new_graph[k]).pings = v.pings.filter(function(v){return tagdsl_eval(rc.beeminder[user_slug],v.tags)})})
-		var t = Object.keys(new_graph).map(i).sort_n(); var start = m(t[0]).add('d',-1)+0; var end = m(t.slice(-1)[0]).add('d',2)+0
-		for (var time = start; time < end; time = m(time).add('d',1)+0) {
+		var t = Object.keys(new_graph).map(i).sort_n(); var start = m(t[0]*1000).add('d',-1)/1000; var end = m(t.slice(-1)[0]*1000).add('d',2)/1000
+		for (var time = start; time < end; time = m(time*1000).add('d',1)/1000) {
 			var id = (graph[time]||{}).id
 			var pings_old = (graph[time]    ||{}).pings||[]; var ol = pings_old.length; var o = pings_old.map(function(v){return v.tags}).join(', ')
 			var pings_new = (new_graph[time]||{}).pings||[]; var nl = pings_new.length; var n = pings_new.map(function(v){return v.tags}).join(', ')
 			//! var v = {timestamp:time, value:nl*rc.period/60, comment:pluralize(nl,'ping')+': '+n}
-			var v = {timestamp:m(time).hour(12)+0, value:nl*rc.period/60, comment:pluralize(nl,'ping')+': '+n}
+			var v = {timestamp:m(time*1000).hour(12)/1000, value:nl*rc.period/60, comment:pluralize(nl,'ping')+': '+n}
 			//! oh dear that is not good; pings should log how much they're worth
 			if (ol===nl && o===n) { // no change to the datapoint on this day
 			} else if (ol===0 && nl > 0) { // no such datapoint on beeminder: CREATE
@@ -291,12 +293,12 @@ function update_graphs(dry_run){
 			} else if (ol!==nl || o!==n) { // bmndr & tagtime log differ: UPDATE
 				print('updating datapoint (old/new):')
 				print('[bID:'+id+']')
-				print(m(time).format(),'',v.value,v.comment)
+				print(m(time*1000).format(),'',v.value,v.comment)
 				if (!dry_run) print(beeminder(user_slug+'.datapoints['+id+'] =',v))
 			} else {
 				print("ERROR: can't tell what to do with this datapoint (old/new):")
 				print('[bID:'+id+']')
-				print(m(time).format(),'',v.value,v.comment)
+				print(m(time*1000).format(),'',v.value,v.comment)
 			}
 		}
 	}) }
@@ -308,7 +310,8 @@ function import_logs(fl){((fs.readFileSync(fl)+'').match(/^....-..-..\//)? ping.
 if (!module.parent) {
 	var v = process.argv.slice(2)
 	if (v.length===0) main()
-	else if (v[0]==='update-graphs') update_graphs(v[1])
+	else if (v.length===1 && v[0]==='update-graphs') update_graphs()
+	else if (v.length===1 && v[0]==='update-graphs-dry') update_graphs(true)
 	else if (v.length===2 && v[0]==='import-logs') import_logs(v[1])
 	else if (v.length===2 && v[0]==='ping-process') ping_process(i(v[1]))
 	else if (v[0]==='e') print(eval(v.slice(1).join(' ')))
