@@ -273,7 +273,6 @@ function update_graphs(dry_run){
 		var t = user_slug.match(/^(.*)\/(.*)$/); var user = t[1]; var slug = t[2]
 		var graph = read_graph(user_slug)
 		var new_graph = read_log_file()
-		process.exit()
 		Object.keys(new_graph).map(function(k){var v; (v=new_graph[k]).pings = v.pings.filter(function(v){return tagdsl_eval(rc.beeminder[user_slug],v.tags)})})
 		var t = Object.keys(new_graph).map(i).sort_n(); var start = m(t[0]*1000).add('d',-1)/1000; var end = m(t.slice(-1)[0]*1000).add('d',2)/1000
 		for (var time = start; time < end; time = m(time*1000).add('d',1)/1000) {
