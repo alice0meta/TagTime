@@ -2,9 +2,12 @@
 
 var fs = require('fs')
 var util = require('util')
-var sync = require('sync')
 var exec = require('child_process').exec
+
+var sync = require('sync')
 var m = require('moment')
+var minimist = require('minimist')
+var mkdirp = require('mkdirp')
 
 // todo:
 // have read_graph cache its results
@@ -49,17 +52,30 @@ sync(err_print(function(){
 	//////////////////  END COPIED SECTION  /////////////////
 	/////////////////////////////////////////////////////////
 
-//===-----------------------===// load rc file //===-----------------------===//
+var F = function(v){return v[0]==='~'? process.env.HOME+v.slice(1) : v}
+fs.writeFileForceSync = function(path,v){mkdirp.sync(path.replace(/[^\/]*$/,'')); fs.writeFileSync(path,v)}
 
-var ttdir = process.env.HOME+'/.tagtime/'
+//===-------------------===// get args and settings //===------------------===//
 
-var rc = eval('('+fs.readFileSync(ttdir+'settings.js')+')')
+//! actually respect --dry everywhere!
+var args = minimist(process.argv.slice(2),{alias:{dry_run:['d','dry-run'],settings:'s'}, default:{settings:'~/.tagtime/settings.js'}})
+
+if (!fs.existsSync(F(args.settings))) {
+	fs.writeFileForceSync(F(args.settings),fs.readFileSync('settings.js'))
+	print("hey! i've put a settings file at",args.settings,"for you. go fill it in and rerun tagtime!")
+	process.exit()
+}
+
+var rc = eval('('+fs.readFileSync(F(args.settings))+')')
+
+var bad45 = rc.period < 45
+var badseed = !((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))
+if (bad45) print('WARNING: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:',rc.period+')')
+if (badseed) print('WARNING: seeds should probably be (1) positive (2) not too close to each other (3) not too big (seed:',rc.seed+')')
+if (bad45 || badseed) process.exit(1)
+
 delete(rc.beeminder[''])
-
-if (rc.period < 45) print('WARNING: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:'+rc.period+')')
-if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) print('WARNING: seeds should probably be (1) positive (2) not too close to each other (3) not too big (seed:'+rc.seed+')')
-
-var pingf = ttdir+rc.ping_file
+rc.f = F(rc.ping_file)
 
 //===----------===// less hacky hacky partial beeminder api //===----------===//
 
@@ -113,6 +129,7 @@ var cyan = function(v){return '\x1b[36;1m'+v+'\x1b[0m'}
 /////  CURRENT IS HERE
 ////////////////////////////////////////////////////
 ////////////////////////////////////////////////////
+//! also, we broke update-graphs
 var ping = (function(){
 	// log format is: 2014-03-26/19:51:56-07:00p22.5 a b c (a:blah)
 	var format = 'YYYY-MM-DD/HH:mm:ssZ'
@@ -192,7 +209,7 @@ function main(){
 	var lock = false // ugly hack
 	setInterval(function(){sync(function(){
 		if (lock) return; lock = true
-		var t; var time = (t=ping.last(pingf))? pings.le(t.time/1000) : pings.lt(now())
+		var t; var time = (t=ping.last(rc.f))? pings.le(t.time/1000) : pings.lt(now())
 		first = first || time
 		while(true) {
 			var last = time; time = pings.gt(time)
@@ -201,7 +218,7 @@ function main(){
 			print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',format_dur(time-last),'','avg',format_dur((time-first)/count),'tot',format_dur(time-first))
 
 			if (time < now()-rc.retro_threshold)
-				ping.append(pingf,{time:m(time*1000), period:rc.period, tags:'afk RETRO'})
+				ping.append(rc.f,{time:m(time*1000), period:rc.period, tags:'afk RETRO'})
 			else
 				prompt_for_ping(time)
 			}
@@ -223,11 +240,11 @@ function ping_process(time){
 		print(divider(''))
 		print()
 		}
-	var last_doing = ping.last(pingf).tags
+	var last_doing = ping.last(rc.f).tags
 	print("It's tag time! What are you doing RIGHT NOW ("+m(time*1000).format('HH:mm:ss')+')?')
 	print('Ditto ('+cyan('"')+') to repeat prev tags:',cyan(last_doing))
 	var t; var tags = (t=read_line_stdin().trim())==='"'? last_doing : t
-	ping.append(pingf,{time:m(time*1000), period:rc.period, tags:tags})
+	ping.append(rc.f,{time:m(time*1000), period:rc.period, tags:tags})
 	update_graphs()
 	process.exit()
 	}
@@ -239,7 +256,7 @@ function update_graphs(dry_run){
 	// okay, so read_graph's ping objects are {tags:,value:}
 
 	// a log file → {date:{pings:[ping]}}
-	function read_log_file(){var r = {}; ping.all(pingf).map(function(v){(r[v.day/1000] = r[v.day/1000] || {pings:[]}).pings.push(v)}); return r}
+	function read_log_file(){var r = {}; ping.all(rc.f).map(function(v){(r[v.day/1000] = r[v.day/1000] || {pings:[]}).pings.push(v)}); return r}
 	// a graph from the beeminder api → {date:{pings:[ping],ids:[id]}}
 	function read_graph(user_slug){
 		var r = {}
@@ -285,15 +302,15 @@ function update_graphs(dry_run){
 			if (ol===nl && o===n) { // no change to the datapoint on this day
 			} else if (ol===0 && nl > 0) { // no such datapoint on beeminder: CREATE
 				print('creating datapoint',v.value,v.comment)
-				if (!dry_run) print(beeminder(user_slug+'.datapoints ~=',[v]))
+				if (!args.dry_run) print(beeminder(user_slug+'.datapoints ~=',[v]))
 			} else if (ol > 0 && nl===0) { // on beeminder but not in tagtime log: DELETE
 				print('deleting datapoint',id)
-				if (!dry_run) print(beeminder(user_slug+'.datapoints['+id+'] ='))
+				if (!args.dry_run) print(beeminder(user_slug+'.datapoints['+id+'] ='))
 			} else if (ol!==nl || o!==n) { // bmndr & tagtime log differ: UPDATE
 				print('updating datapoint (old/new):')
 				print('[bID:'+id+']')
 				print(m(time*1000).format(),'',v.value,v.comment)
-				if (!dry_run) print(beeminder(user_slug+'.datapoints['+id+'] =',v))
+				if (!args.dry_run) print(beeminder(user_slug+'.datapoints['+id+'] =',v))
 			} else {
 				print("ERROR: can't tell what to do with this datapoint (old/new):")
 				print('[bID:'+id+']')
@@ -302,20 +319,19 @@ function update_graphs(dry_run){
 		}
 	}) }
 
-function import_logs(fl){((fs.readFileSync(fl)+'').match(/^....-..-..\//)? ping.all(fl) : ping.all_old(fl)).map(function(v){ping.append(pingf,v)})}
+function import_logs(fl){((fs.readFileSync(fl)+'').match(/^....-..-..\//)? ping.all(fl) : ping.all_old(fl)).map(function(v){ping.append(rc.f,v)})}
 
-//===---------------------===// choose from argv //===---------------------===//
+//===----------------===// call function based on args //===---------------===//
 
-if (!module.parent) {
-	var v = process.argv.slice(2)
-	if (v.length===0) main()
-	else if (v.length===1 && v[0]==='update-graphs') update_graphs()
-	else if (v.length===1 && v[0]==='update-graphs-dry') update_graphs(true)
-	else if (v.length===2 && v[0]==='import-logs') import_logs(v[1])
-	else if (v.length===2 && v[0]==='ping-process') ping_process(i(v[1]))
-	else if (v[0]==='e') print(eval(v.slice(1).join(' ')))
-	else print('usage: ./tagtime.js')
-	}
+if (module.parent) print("oh my goodness, so sorry, but, tagtime.js isn't built to be require()'d!")
+else switch (args._[0]) {
+	case undefined:       main(); break
+	case 'update-graphs': update_graphs(); break
+	case 'import-logs'  : import_logs(args._[1]); break
+	case 'ping-process' : ping_process(i(args._[1])); break
+	case 'e'            : print(eval(args._.slice(1).join(' '))); break
+	default             : print('usage: tagtime.js (update-graphs | import-logs file)? (--settings <file>)? (--dry-run)?'); break
+}
 
 //===---------------------------===// <end> //===--------------------------===//
 

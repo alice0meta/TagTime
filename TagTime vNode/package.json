@@ -1,6 +1,8 @@
 {
 	"dependencies": {
 		"sync": "*",
+		"minimist": "*",
+		"mkdirp": "*",
 		"moment": "*"
 	}
 }

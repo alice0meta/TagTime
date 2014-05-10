@@ -14,7 +14,7 @@
 	period: 45, // average number of minutes between pings
 	seed: 666, // for pings not in sync with others, change this
 
-	ping_file: 'pings.log', // file pings output to
+	ping_file: '~/.tagtime/pings.log',
 	editor: '', // "CHANGEME if you don't like vi (eg: /usr/bin/pico)"
 	terminal: '', // "CHANGEME to your path to xterm"
 	enforce_nums: false, // whether it forces you to include a number in your ping response (include tag non or nonXX where XX is day  of month to override). This is for task editor integration.
