@@ -3,6 +3,7 @@
 		"sync": "*",
 		"minimist": "*",
 		"mkdirp": "*",
+		"underscore": "*",
 		"moment": "*"
 	}
 }
