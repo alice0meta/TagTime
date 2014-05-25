@@ -29,6 +29,11 @@ var _ = require('underscore')
 // make sure parens are implemented
 // ??sortedness of log files??
 // ?? maybe allow multidirectional sync with beeminder graphs ??
+// actually test this with a 5MB logfile
+// bah, fuck, i ate the timezone information again. fix?
+// "Tiny improvement to TagTime for Android: pings sent to Beeminder include the time in the datapoint comment"
+// ? what determines a day beeminder-wise ? it's looking like maybe beeminder is just completely ignoring timezones. try uploading a datapoint at a nonstandard time?
+// rename → TagTime v1
 
 var err_print = function(f){return function(){try{f()} catch (e) {console.log('ERROR:',e,e.message,e.stack)}}}
 sync(err_print(function(){
@@ -203,10 +208,8 @@ var main = function(){
 
 	var first
 	var count = 0
-	var lock = false // ugly hack
-	setInterval(function(){sync(function(){
-		if (lock) return; lock = true
-		var t; var time = (t=ping_file.last(rc.f))? pings.le(t.time/1000) : pings.lt(now())
+	while (true) {
+		var t; var time = (t=ping_file.last(rc.f))? pings.le(t.time) : pings.lt(now())
 		first = first || time
 		while(true) {
 			var last = time; time = pings.gt(time)
@@ -219,12 +222,13 @@ var main = function(){
 			else
 				prompt_for_ping(time)
 			}
-		lock = false
-		})},3000)
-	}
+		sleep(60) } }
 
 // prompt for what you're doing RIGHT NOW. blocks until completion.
-var prompt_for_ping = function(time){exec.sync(null,'start bash -ci "tagtime.js ping-process '+Math.round(time)+';pause"')}
+var prompt_for_ping = function(time){
+	//print('trying to prompt')
+	//print(rc.terminal.replace('__CODE__','cd \\\\\\"$(pwd)\\\\\\"; ./tagtime.js ping-process '+Math.round(time)))
+	exec.sync(null,rc.terminal.replace('__CODE__','cd \\\\\\"$(pwd)\\\\\\"; ./tagtime.js ping-process '+Math.round(time)))}
 var ping_process = function(time){
 	print('\u0007')
 	if (now() - time > 9) {
@@ -360,3 +364,21 @@ default            : print('usage: tagtime.js (sync | merge <file>)? (--settings
 //===---------------------------===// <end> //===--------------------------===//
 
 }))
+/*
+Last login: Tue May 20 21:18:47 on ttys005
+cd "/Users/ali/ali/github/TagTime/TagTime vNode"; ./tagtime.js ping-process 1400647074; pause
+/Users/ali>cd "/Users/ali/ali/github/TagTime/TagTime vNode"; ./tagtime.js ping-process 1400647074; pause
+
+It's tag time! What are you doing RIGHT NOW (21:37:54)?
+Ditto (") to repeat prev tags: b support
+b support meta hipchat
+-------------- synchonizing beeminder graphs with local logfile ---------------
+---------------------- updating bmndr/alice0meta/support ----------------------
++ CREATE: 2014-05-21 3 pings: b support, b support, b support meta hipchat
+= UPDATE: 2014-05-20 2 pings: b support, b support hipchat meta
+----------------------- updating bmndr/alice0meta/meta ------------------------
++ CREATE: 2014-05-21 3 pings: b support, b support, b support meta hipchat
+= UPDATE: 2014-05-20 2 pings: b support, b support hipchat meta
+Press [Enter] to continue . . .-bash: read: read error: 0: Resource temporarily unavailable
+/Users/ali/ali/github/TagTime/TagTime vNode>
+*/
