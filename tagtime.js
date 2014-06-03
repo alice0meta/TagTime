@@ -21,11 +21,6 @@ var _ = require('underscore')
 // pings_if(): skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level (current afk behavior is undesirable in many ways)
 // pings_if(): after logging old datapoints, open the log file in an editor
 // //! comments
-// maybe refactor ping algorithm *again* to avoid maintaining state
-// tagtime bug:
-//		/c/Users/zii/ali/code/github/TagTime/src/clone>tagtime.js
-//		TagTime is watching you! Last ping would've been 36m20s ago, at 18:16:17
-//		1: PING! 2014-04-17/18:16:17 gap 41m19s  avg 41m19s tot 41m19s
 // make sure parens are implemented
 // ??sortedness of log files??
 // ?? maybe allow multidirectional sync with beeminder graphs ??
@@ -33,7 +28,12 @@ var _ = require('underscore')
 // bah, fuck, i ate the timezone information again. fix?
 // "Tiny improvement to TagTime for Android: pings sent to Beeminder include the time in the datapoint comment"
 // ? what determines a day beeminder-wise ? it's looking like maybe beeminder is just completely ignoring timezones. try uploading a datapoint at a nonstandard time?
-// rename → TagTime v1
+// notes on danny's tagtime workflow: when entering tags, <enter> will just go straight to the editor. xterm mechanics is just that tagtime calls xterm with appropriate arguments and then is a running program in xterm. and then can optionally call editors and stuff.
+
+// okay. so we can't find a closed form. so our ping algorithm is probably ridiculously overcomplicated, geez. decomplicate it!
+// maybe refactor ping algorithm *again* to avoid maintaining state
+
+// oh dang! we have not been waiting for the async things to return before calling process.exit()
 
 var err_print = function(f){return function(){try{f()} catch (e) {console.log('ERROR:',e,e.message,e.stack)}}}
 sync(err_print(function(){
@@ -130,6 +130,7 @@ var cyan = function(v){return '\x1b[36;1m'+v+'\x1b[0m'}
 Function.prototype.async = function(){this.apply(null,Array.prototype.slice.apply(arguments).concat([function(e){if (e) print('ASYNC ERROR:',e)}]))}
 var path_resolve = function(fl){var r = path.resolve(fl); var h = process.env.HOME; return r.slice(0,h.length)===h? '~'+r.slice(h.length) : r}
 var sleep = function(time){(function(cb){setTimeout(cb,time*1000)}).sync()}
+var log_io = function(f){return function(){var a = Array.prototype.slice.apply(arguments); var r = f.apply(this,a); print.apply(undefined,[['IO:',f.name],a,['→',r]].m_concat()); return r}}
 
 //===-------------===// ping file parser and stringifier //===-------------===//
 
@@ -193,26 +194,25 @@ var pings = (function(){
 	else {seqs = range(Math.ceil(seq_count)).map(function(v){return {seed:rc.seed+v, i:0, ping:1184083200}}); seqs = seqs.map(next_s)} // the birth of timepie/tagtime!
 
 	return {
-		// time → nearest ping time < ≤ > ≥ time
-		lt: function(time){while (get() <  time) next(); while (get() >= time) prev(); return get()},
-		le: function(time){while (get() <= time) next(); while (get() >  time) prev(); return get()},
-		gt: function(time){while (get() >  time) prev(); while (get() <= time) next(); return get()},
-		ge: function(time){while (get() >= time) prev(); while (get() <  time) next(); return get()}
+		// time → nearest ping time ≤ time
+		le:   function(time){while (get() <= time) next(); while (get() >  time) prev(); return get()},
+		// time → nearest ping time > time
+		next: function(time){while (get() >  time) prev(); while (get() <= time) next(); return get()},
 	} })()
 
 //===--===// fns loosely corresponding to the original architecture //===--===//
 
 // beeps at appropriate times and opens ping windows
 var main = function(){
-	var n; var t; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=pings.lt(n))),'ago, at',m(t*1000).format('HH:mm:ss'))
+	var n; var t; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=pings.le(n))),'ago, at',m(t*1000).format('HH:mm:ss'))
 
 	var first
 	var count = 0
 	while (true) {
-		var t; var time = (t=ping_file.last(rc.f))? pings.le(t.time) : pings.lt(now())
+		var t; var time = pings.le((t=ping_file.last(rc.f))? t.time : now())
 		first = first || time
 		while(true) {
-			var last = time; time = pings.gt(time)
+			var last = time; time = pings.next(time)
 			if (!(time <= now())) break
 
 			print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',format_dur(time-last),'','avg',format_dur((time-first)/count),'tot',format_dur(time-first))
@@ -247,7 +247,7 @@ var ping_process = function(time){
 	var t; var tags = (t=read_line_stdin().trim())==='"'? last_doing : t
 	ping_file.append(rc.f,{time:time, period:rc.period, tags:tags})
 	tt_sync()
-	process.exit()
+	//process.exit()
 	}
 
 var tt_sync = function(){
@@ -364,21 +364,3 @@ default            : print('usage: tagtime.js (sync | merge <file>)? (--settings
 //===---------------------------===// <end> //===--------------------------===//
 
 }))
-/*
-Last login: Tue May 20 21:18:47 on ttys005
-cd "/Users/ali/ali/github/TagTime/TagTime vNode"; ./tagtime.js ping-process 1400647074; pause
-/Users/ali>cd "/Users/ali/ali/github/TagTime/TagTime vNode"; ./tagtime.js ping-process 1400647074; pause
-
-It's tag time! What are you doing RIGHT NOW (21:37:54)?
-Ditto (") to repeat prev tags: b support
-b support meta hipchat
--------------- synchonizing beeminder graphs with local logfile ---------------
----------------------- updating bmndr/alice0meta/support ----------------------
-+ CREATE: 2014-05-21 3 pings: b support, b support, b support meta hipchat
-= UPDATE: 2014-05-20 2 pings: b support, b support hipchat meta
------------------------ updating bmndr/alice0meta/meta ------------------------
-+ CREATE: 2014-05-21 3 pings: b support, b support, b support meta hipchat
-= UPDATE: 2014-05-20 2 pings: b support, b support hipchat meta
-Press [Enter] to continue . . .-bash: read: read error: 0: Resource temporarily unavailable
-/Users/ali/ali/github/TagTime/TagTime vNode>
-*/
