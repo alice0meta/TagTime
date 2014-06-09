@@ -5,6 +5,7 @@ var path = require('path')
 var exec = require('child_process').exec
 
 var sync = require('sync')
+var async = require('async')
 var m = require('moment')
 var minimist = require('minimist')
 var mkdirp = require('mkdirp')
@@ -33,9 +34,7 @@ var _ = require('underscore')
 // okay. so we can't find a closed form. so our ping algorithm is probably ridiculously overcomplicated, geez. decomplicate it!
 // maybe refactor ping algorithm *again* to avoid maintaining state
 
-// oh dang! we have not been waiting for the async things to return before calling process.exit()
-
-var err_print = function(f){return function(){try{f()} catch (e) {console.log('ERROR:',e,e.message,e.stack)}}}
+var err_print = function(f){return function(){try{f()} catch (e) {console.log('ERROR:',e,e.stack)}}}
 sync(err_print(function(){
 
 ////////////////////////////////////////////////////
@@ -73,15 +72,10 @@ if (!fs.existsSync(F(args.settings))) {
 	process.exit() }
 
 var rc = eval('('+fs.readFileSync(F(args.settings))+')')
-
-var bad45 = rc.period < 45
-var badseed = !((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))
-if (bad45) print('ERROR: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:',rc.period+')')
-if (badseed) print('ERROR: seeds should probably be (1) positive (2) not too close to each other (3) not too big (seed:',rc.seed+')')
-if (bad45 || badseed) process.exit(1)
-
-delete(rc.beeminder[''])
 rc.f = F(rc.ping_file)
+
+if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:',rc.period+')'); process.exit(1)}
+if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) {print('ERROR: seeds probably should be positive, not too close to each other, and not too big (seed:',rc.seed+'). How about',(1000 + Math.round(Math.random()*2000))+'?'); process.exit(1)}
 
 //===----------===// less hacky hacky partial beeminder api //===----------===//
 
@@ -97,11 +91,11 @@ var request = function(method,path,query,headers,cb){
 			t = t.join('')
 			var err=null; var json; try {json = JSON.parse(t)} catch (e) {err = e}
 			cb(err,{json:json,string:t,response:resp}) }) }).end() }
-var beeminder_a = function(v){var a = arguments; var cb = a[a.length-1]; var arg = a.length > 2? a[1] : undefined
+var beeminder = function(v){var a = arguments; var cb = a[a.length-1]; var arg = a.length > 2? a[1] : undefined
 	var base = 'https://www.beeminder.com/api/v1/'
 	var auth = {auth_token:rc.auth.beeminder}
-	var t0 = cb; cb = function(err,v){if (!err && (v.errors || v.error)) t0(v.errors||v.error,v); else t0(err,v)}
-	var t1 = cb; cb = function(err,v){t1(err, err? v : v.json)}
+	var t0 = cb; cb = function(e,v){if (!e && (v.error || (v.errors && v.errors.length > 0))) t0(v.error||v.errors,v); else t0(e,v)}
+	var t1 = cb; cb = function(e,v){t1(e, e? v : v.json)}
 	var ug = v.match(/^(.+)\/(.+)$/)
 	var ugd = v.match(/^(.+)\/(.+)\.datapoints$/)
 	var ugdc = v.match(/^(.+)\/(.+)\.datapoints ~=$/)
@@ -113,13 +107,12 @@ var beeminder_a = function(v){var a = arguments; var cb = a[a.length-1]; var arg
 	else if (ugdu && !arg) request('DELETE',base+'users/'+ugdu[1]+'/goals/'+ugdu[2]+'/datapoints/'+ugdu[3]+'.json',auth,{},cb)
 	else request('GET',base+'users/'+ug[1]+'/goals/'+ug[2]+'.json',auth,{},cb)
 	}
-var beeminder = function(){return beeminder_a.sync.apply(beeminder_a,[null].concat(Array.prototype.slice.apply(arguments)))}
 
 //===---------------------------===// util //===---------------------------===//
 
 var f0 = function(f){return function(v){return f(v)}}
 var i = f0(parseInt)
-var err = function(v){throw Error(v)}
+var err = function(v){print.apply(null,['#err#'].concat(arguments)); throw Error(v)}
 var pluralize = function(n,noun){return n+' '+noun+(n==1?'':'s')}
 Array.prototype.sort_n = function(){return this.sort(function(a,b){return a-b})}
 var divider = function(v){ // 'foo' → '-----foo-----' of length 79
@@ -127,7 +120,7 @@ var divider = function(v){ // 'foo' → '-----foo-----' of length 79
 	return '-'.repeat(left)+v+'-'.repeat(right)}
 var read_line_stdin = function(){return (function(cb){process.stdin.on('readable', function(){var t; if ((t=process.stdin.read())!==null) cb(undefined,t+'')})}).sync()}
 var cyan = function(v){return '\x1b[36;1m'+v+'\x1b[0m'}
-Function.prototype.async = function(){this.apply(null,Array.prototype.slice.apply(arguments).concat([function(e){if (e) print('ASYNC ERROR:',e)}]))}
+var a_err = function(e,v){if (e) print('ASYNC ERROR:',e)}
 var path_resolve = function(fl){var r = path.resolve(fl); var h = process.env.HOME; return r.slice(0,h.length)===h? '~'+r.slice(h.length) : r}
 var sleep = function(time){(function(cb){setTimeout(cb,time*1000)}).sync()}
 var log_io = function(f){return function(){var a = Array.prototype.slice.apply(arguments); var r = f.apply(this,a); print.apply(undefined,[['IO:',f.name],a,['→',r]].m_concat()); return r}}
@@ -152,7 +145,7 @@ var ping_file = (function(){
 
 //===----------------------===// ping algorithm //===----------------------===//
 
-var pings = (function(){
+var pings_old = (function(){
 	// utils
 	var bit_reverse = function(length,v){var r = 0; for (var i=0;i<length;i++){r = (r << 1) | (v & 1); v = v >> 1}; return r}
 	var pow_mod = function(v,e,m){ // vᵉ % m
@@ -200,19 +193,67 @@ var pings = (function(){
 		next: function(time){while (get() >  time) prev(); while (get() <= time) next(); return get()},
 	} })()
 
+var ping_function = (function(){
+	// utils
+	var bit_reverse = function(length,v){var r = 0; for (var i=0;i<length;i++){r = (r << 1) | (v & 1); v = v >> 1}; return r}
+	var range = function(l){var r = []; for (var i=0;i<l;i++) r.push(i); return r}
+	var min_by = function(v,f){
+		var r = [v[0],0]
+		if (v.length <= 1) return r
+		var fr = f(r[0])
+		v.slice(1).map(function(v,i){var t; if ((t=f(v)) < fr) {r = [v,i]; fr = t}})
+		return r}
+	var max_by = function(v,f){
+		var r = [v[0],0]
+		if (v.length <= 1) return r
+		var fr = f(r[0])
+		v.slice(1).map(function(v,i){var t; if ((t=f(v)) > fr) {r = [v,i]; fr = t}})
+		return r}
+	
+	// see p37 of Simulation by Ross
+	var ran0 = function(seed){return Math.pow(7,5)*seed % (Math.pow(2,31)-1)} // ran0 from Numerical Recipes
+	var ping_next = function(ping){var t = ran0(ping.seed); return {seed:t, time:ping.time+Math.max(1,Math.round(-45*60*Math.log(t / (Math.pow(2,31)-1))))}}
+
+	var seq_count = 45 / rc.period
+	var seq_fraction = seq_count+1 - Math.ceil(seq_count)
+	var seqs
+
+	// if (Math.ceil(seq_count)===1 && rc.seed===666) {seqs = [{seed:?, time:1401267914}]; prev()} // optimization: a recent seqs
+	// else {seqs = range(Math.ceil(seq_count)).map(function(v){return {seed:rc.seed+v, time:1184083200}}); seqs = seqs.map(next_s)} // the birth of timepie/tagtime!
+
+	//! eep. i'm not sure if v.seed or maybe ran0(v.seed) is the right thing to bit_reverse (originally we had ran0_closed(v.seed_0,v.i))
+	var again = seq_fraction===1? function(v,i){return false} : function(v,i){return i===seqs.length-1 && !(bit_reverse(31,v.seed) / (Math.pow(2,31)-1) <= seq_fraction)}
+	var next_s = function λ(v,i){var t = again(v,i); var r = ping_next(v); if (t) r = λ(r,i); r.prev = {seed:v.seed, time:v.time}; return r}
+
+	var reset_before = function(time){
+		seqs = range(Math.ceil(seq_count)).map(function(v){return {seed:rc.seed+v, time:1184083200}}); seqs = seqs.map(next_s)
+	}
+	var get = function(){var r = min_by(seqs,function(v){return v.time})[0].time; if (r!==r) print('//!',seqs); return r}
+	var next = function(){var t = min_by(seqs,function(v){return v.time}); seqs[t[1]] = next_s(t[0],t[1])}
+	var prev = function(){var t = max_by(seqs,function(v){return v.prev.time}); seqs[t[1]] = t[0].prev}
+
+	reset_before(now())
+
+	return {
+		// time → nearest ping time ≤ time
+		le: function(time){while (get() > time) reset_before(time); while (get() <= time) next(); prev(); if (get()!==pings_old.le(time)) err('oh dear ≤.',time,pings_old.le(time),get()); /*print('≤',seqs);*/ return get()},
+		//??
+		next: function(time){next(); if (get()!==pings_old.next(time)) err('oh dear >.',time,pings_old.next(time),get()); /*print('>',seqs);*/ return get()},
+	} })()
+
 //===--===// fns loosely corresponding to the original architecture //===--===//
 
 // beeps at appropriate times and opens ping windows
 var main = function(){
-	var n; var t; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=pings.le(n))),'ago, at',m(t*1000).format('HH:mm:ss'))
+	var n; var t; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=ping_function.le(n))),'ago, at',m(t*1000).format('HH:mm:ss'))
 
 	var first
 	var count = 0
 	while (true) {
-		var t; var time = pings.le((t=ping_file.last(rc.f))? t.time : now())
+		var t; var time = ping_function.le((t=ping_file.last(rc.f))? t.time : now())
 		first = first || time
 		while(true) {
-			var last = time; time = pings.next(time)
+			var last = time; time = ping_function.next(time)
 			if (!(time <= now())) break
 
 			print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',format_dur(time-last),'','avg',format_dur((time-first)/count),'tot',format_dur(time-first))
@@ -247,7 +288,7 @@ var ping_process = function(time){
 	var t; var tags = (t=read_line_stdin().trim())==='"'? last_doing : t
 	ping_file.append(rc.f,{time:time, period:rc.period, tags:tags})
 	tt_sync()
-	//process.exit()
+	process.exit()
 	}
 
 var tt_sync = function(){
@@ -276,7 +317,7 @@ var sync_bee = function(){
 			else {print('oh no, bad tag dsl!',f); throw 'BAD_TAG_DSL'}
 			} }
 
-	var generate_actions = function(f_pings,b_pings){
+	var generate_actions = function(user_slug,f_pings,b_pings){
 		f_pings = _.sortBy(f_pings,'time') //! maybe don't need to sort these two?
 		b_pings = _.sortBy(b_pings,'time')
 		f_pings.map(function(v){v.group_time = Math.round(v.time/86400 - 2/3)*86400 + 86400*2/3})
@@ -296,7 +337,7 @@ var sync_bee = function(){
 		add_pings.map(function(v){v.add = true})
 		kill_pings.map(function(v){v.kill = true})
 
-		var r = _.values(_.groupBy(add_pings.concat(b_pings),function(v){return v.group_time+' '+v.period})).map(function(v){
+		var actions = _.values(_.groupBy(add_pings.concat(b_pings),function(v){return v.group_time+' '+v.period})).map(function(v){
 			if (!v.some(function(v){return v.add || v.kill})) // no change
 				return undefined
 			else if (v.every(function(v){return v.add})) // log and ¬bee: CREATE
@@ -311,37 +352,39 @@ var sync_bee = function(){
 				var id = t.length===0? kill[0].id : t[0][0].id
 				return [['UPDATE',id,{timestamp:v[0].group_time, value:set.length*v[0].period/60, comment:pluralize(set.length,'ping')+': '+_.pluck(set,'tags').join(', ')}]].concat(kill.filter(function(v){return v.id!==id}).map(function(v){return ['DELETE',{timestamp:v.time,id:v.id}]}))
 			} }).filter(function(v){return v}).m_concat()
-		return _.groupBy(r,function(v){return v[0]}) }
+		actions = _.groupBy(actions,function(v){return v[0]})
+		var CREATE = (actions.CREATE||[]).map(function(v){return v[1]})
+		var UPDATE = (actions.UPDATE||[])
+		var DELETE = _.uniq((actions.DELETE||[]).map(function(v){return v[1]}),function(v){return v.id})
+		var ymd = function(v){return m.utc(v.timestamp*1000).format('YYYY-MM-DD')}
+		return {
+			msgs: [
+				CREATE.map(function(v){return v.map(function(v){return '+ CREATE: '+ymd(v)+' '+v.comment})}).m_concat(),
+				UPDATE.map(function(v){return '= UPDATE: '+ymd(v[2])+' '+v[2].comment}),
+				DELETE.map(function(v){return '- DELETE: '+ymd(v)+' '+v.id}),
+				].m_concat(),
+			cmds: [
+				[[user_slug+'.datapoints ~=',CREATE]],
+				UPDATE.map(function(v){return [user_slug+'.datapoints['+v[1]+'] =',v[2]]}),
+				DELETE.map(function(v){return [user_slug+'.datapoints['+v.id+'] =']}),
+				].m_concat(),
+			} }
 
-	var ymd = function(v){return m.utc(v.timestamp*1000).format('YYYY-MM-DD')}
+	var action_sets = async.parallel.sync(null,Object.keys(rc.beeminder).map(function(user_slug){return function(cb){
+		beeminder(user_slug+'.datapoints',function(e,v){if (e) cb(e,v); else {
+			cb(0,{user_slug:user_slug,
+				actions: generate_actions(
+					user_slug,
+					logfile_pings().filter(function(v){return tagdsl_eval(rc.beeminder[user_slug],v.tags)}),
+					beeminder_pings(v))
+				}) }}) }}))
 
-	var count = 0
-	var lock
-	Object.keys(rc.beeminder).map(function(user_slug){
-		beeminder_a(user_slug+'.datapoints',function(e,v){sync(err_print(function(){if (e) err('ASYNC ERROR: '+e); else {
-			var actions = generate_actions(
-				logfile_pings().filter(function(v){return tagdsl_eval(rc.beeminder[user_slug],v.tags)}),
-				beeminder_pings(v))
+	if (!args.dry_run) async.parallel.sync(null,action_sets.map(function(v){return v.actions.cmds}).m_concat().map(function(v){return function(cb){beeminder.apply(null,v.concat([cb]))}}))
 
-			while (lock) sleep(0.02)
-			lock = true
-
-			print(divider(' updating bmndr/'+user_slug+' '))
-			if (actions.CREATE) {
-				var create = actions.CREATE.map(function(v){return v[1]})
-				create.map(function(v){print(('+ CREATE: '+ymd(v)+' '+v.comment).slice(0,80))})
-				if (!args.dry_run) beeminder_a.async(user_slug+'.datapoints ~=',create) }
-			;(actions.UPDATE||[]).map(function(t){var id = t[1]; var v = t[2]
-				print(('= UPDATE: '+ymd(v)+' '+v.comment).slice(0,80))
-				if (!args.dry_run) beeminder_a.async(user_slug+'.datapoints['+id+'] =',v) })
-			_.uniq((actions.DELETE||[]).map(function(v){return v[1]}),function(v){return v.id}).map(function(v){
-				print(('- DELETE: '+ymd(v)+' '+v.id).slice(0,80))
-				if (!args.dry_run) beeminder_a.async(user_slug+'.datapoints['+v.id+'] =') })
-
-			lock = undefined
-			count++
-		} })) }) })
-	while (count < Object.keys(rc.beeminder).length) sleep(0.02)
+	action_sets.map(function(v){
+		print(divider(' updating bmndr/'+v.user_slug+' '))
+		v.actions.msgs.map(function(v){print(v.slice(0,80))})
+	})
 	}
 
 var merge = function(fl){

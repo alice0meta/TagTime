@@ -10,7 +10,7 @@
 		// 'bob/play': 'fun or whee',               // send 'fun' pings and 'whee' pings to bmndr.com/bob/play
 		// 'carol/nafk': 'not afk',                 // send pings that are not 'afk' pings to bmndr.com/carol/nafk
 		// 'dave/real-work': 'job and not akrasia', // send 'job' pings that are not 'akrasia' to bmndr.com/dave/real-work
-	'':''},
+	},
 	grouping: true, // group pings by day
 	//grouping: false, // have a datapoint for each ping
 	//grouping: 'bob/play bob/work', // group pings for bob/play and bob/work but not any others
@@ -21,4 +21,4 @@
 	editor: '', //! todo: implement // "CHANGEME if you don't like vi (eg: /usr/bin/pico)"
 	terminal: 'osascript -e "tell app \\"Terminal\\" to do script \\"__CODE__; pause; exit\\""', // change if you want xterm or aren't on osx
 	enforce_nums: false, //! todo: implement // whether it forces you to include a number in your ping response (include tag non or nonXX where XX is day  of month to override). This is for task editor integration.
-'':''}
+}
