@@ -359,7 +359,7 @@ var sync_bee = function(){
 		var ymd = function(v){return m.utc(v.timestamp*1000).format('YYYY-MM-DD')}
 		return {
 			msgs: [
-				CREATE.map(function(v){return v.map(function(v){return '+ CREATE: '+ymd(v)+' '+v.comment})}).m_concat(),
+				CREATE.map(function(v){return '+ CREATE: '+ymd(v)+' '+v.comment}),
 				UPDATE.map(function(v){return '= UPDATE: '+ymd(v[2])+' '+v[2].comment}),
 				DELETE.map(function(v){return '- DELETE: '+ymd(v)+' '+v.id}),
 				].m_concat(),
@@ -379,12 +379,12 @@ var sync_bee = function(){
 					beeminder_pings(v))
 				}) }}) }}))
 
-	if (!args.dry_run) async.parallel.sync(null,action_sets.map(function(v){return v.actions.cmds}).m_concat().map(function(v){return function(cb){beeminder.apply(null,v.concat([cb]))}}))
-
 	action_sets.map(function(v){
 		print(divider(' updating bmndr/'+v.user_slug+' '))
 		v.actions.msgs.map(function(v){print(v.slice(0,80))})
 	})
+
+	if (!args.dry_run) async.parallel.sync(null,action_sets.map(function(v){return v.actions.cmds}).m_concat().map(function(v){return function(cb){beeminder.apply(null,v.concat([cb]))}}))
 	}
 
 var merge = function(fl){
