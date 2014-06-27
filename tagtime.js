@@ -256,7 +256,7 @@ var main = function(){
 			var last = time; time = ping_function.next(time)
 			if (!(time <= now())) break
 
-			print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',format_dur(time-last),'','avg',format_dur((time-first)/count),'tot',format_dur(time-first))
+			print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',pad(format_dur(time-last),' ',9),'avg',format_dur((time-first)/count),'tot',format_dur(time-first))
 
 			if (time < now()-rc.retro_threshold)
 				ping_file.append(rc.f,{time:time, period:rc.period, tags:'afk RETRO'})
@@ -267,9 +267,12 @@ var main = function(){
 
 // prompt for what you're doing RIGHT NOW. blocks until completion.
 var prompt_for_ping = function(time){
-	//print('trying to prompt')
+	var t = Math.round(Math.random()*100)
+	print('trying to prompt',t)
 	//print(rc.terminal.replace('__CODE__','cd \\\\\\"$(pwd)\\\\\\"; ./tagtime.js ping-process '+Math.round(time)))
-	exec.sync(null,rc.terminal.replace('__CODE__','cd \\\\\\"$(pwd)\\\\\\"; ./tagtime.js ping-process '+Math.round(time)))}
+	exec.sync(null,rc.terminal.replace('__CODE__','cd \\\\\\"$(pwd)\\\\\\"; ./tagtime.js ping-process '+Math.round(time)))
+	print('prompt terminated',t)
+	}
 var ping_process = function(time){
 	print('\u0007')
 	if (now() - time > 9) {
