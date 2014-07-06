@@ -1,6 +1,6 @@
 {
 	period: 45, // average number of minutes between pings
-	ping_file: '~/.tagtime/pings.log',
+	ping_file: '~/pings.log', // CHANGEME to <yourname>.log
 
 	auth: {beeminder: "xxxxxxxxxxxxxxxxxxxx"}, // get your auth token from https://www.beeminder.com/api/v1/auth_token.json when signed in
 	beeminder: {

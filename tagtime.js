@@ -1,14 +1,11 @@
-#!/usr/bin/env node
+#!/usr/bin/env ζ₀ core
 
-var fs = require('fs')
-var path = require('path')
 var exec = require('child_process').exec
 
 var sync = require('sync')
 var async = require('async')
 var m = require('moment')
 var minimist = require('minimist')
-var mkdirp = require('mkdirp')
 var _ = require('underscore')
 
 // todo:
@@ -40,7 +37,6 @@ sync(err_print(function(){
 ////////////////////////////////////////////////////
 /////  THE FOLLOWING IS COPIED FROM ELSEWHERE  ///// userscripts/gitminder, lang-alpha, stopwatch.js
 ////////////////////////////////////////////////////
-	var print = console.log.bind(console)
 	var merge_o = function(a,b){var r = {}; Object.keys(a).forEach(function(k){r[k] = a[k]}); Object.keys(b).forEach(function(k){r[k] = b[k]}); return r}
 	var seq = function(v){return typeof v === 'string'? v.split('') : v instanceof Array? v : Object.keys(v).map(function(k){return [k,v[k]]})}
 	var frequencies = function(v){return v.reduce(function(r,v){r[v] = v in r? r[v]+1 : 1; return r},{})}
@@ -58,21 +54,18 @@ sync(err_print(function(){
 	//////////////////  END COPIED SECTION  /////////////////
 	/////////////////////////////////////////////////////////
 
-var F = function(v){return v[0]==='~'? process.env.HOME+v.slice(1) : v}
-fs.writeFileForceSync = function(path,v){mkdirp.sync(path.replace(/[^\/]*$/,'')); fs.writeFileSync(path,v)}
-
 //===-------------------===// get args and settings //===------------------===//
 
 //! actually respect --dry everywhere!
-var args = minimist(process.argv.slice(2),{alias:{dry_run:['d','dry','dry-run'],settings:'s'}, default:{settings:'~/.tagtime/settings.js'}})
+var args = minimist(argv._,{alias:{dry_run:['d','dry','dry-run'],settings:'s'}, default:{settings:'~/.tagtime-rc'}})
 
-if (!fs.existsSync(F(args.settings))) {
-	fs.writeFileForceSync(F(args.settings),fs.readFileSync('settings.js'))
-	print("hey! i've put a settings file at",args.settings,"for you. go fill it in and rerun tagtime!")
-	process.exit() }
+if (!fs(args.settings).exists()) {
+	fs(args.settings).$ = fs('settings.js').$
+	print("hey! I've put a settings file at",args.settings,"for you. Go fill it in and rerun tagtime!")
+	setTimeout(function(){process.exit()},200) //! wtf
+	}
 
-var rc = eval('('+fs.readFileSync(F(args.settings))+')')
-rc.f = F(rc.ping_file)
+var rc = eval('('+fs(args.settings).$+')')
 
 if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:',rc.period+')'); process.exit(1)}
 if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) {print('ERROR: seeds probably should be positive, not too close to each other, and not too big (seed:',rc.seed+'). How about',(1000 + Math.round(Math.random()*2000))+'?'); process.exit(1)}
@@ -135,11 +128,11 @@ var ping_file = (function(){
 		else {var t = v.match(/^(\d+)([^\[]+)/); return {time:i(t[1]), period:rc.period, tags:t[2].trim()}}
 		}
 	var stringify = function(v){return m(v.time*1000).format(format)+(v.period===45?'':'p'+v.period)+' '+v.tags}
-	var read_nonblank_lines = function(fl){return (fs.readFileSync(fl)+'').split('\n').filter(function(v){return v!==''})}
+	var read_nonblank_lines = function(fl){return fs(fl).$.split('\n').filter(function(v){return v!==''})}
 	return {
 		last: function(fl){var t; return (t=read_nonblank_lines(fl).slice(-1)[0])? parse(t) : undefined},
-		append: function(fl,v){fs.appendFileSync(fl,stringify(v)+'\n')},
-		write: function(fl,v){fs.writeFileSync(fl,v.map(stringify).join('\n')+'\n')},
+		append: function(fl,v){fs(fl).append(stringify(v)+'\n')},
+		write: function(fl,v){fs(fl).$ = v.map(stringify).join('\n')+'\n'},
 		all: function(fl){return read_nonblank_lines(fl).map(parse)},
 	} })()
 
@@ -250,7 +243,7 @@ var main = function(){
 	var first
 	var count = 0
 	while (true) {
-		var t; var time = ping_function.le((t=ping_file.last(rc.f))? t.time : now())
+		var t; var time = ping_function.le((t=ping_file.last(rc.ping_file))? t.time : now())
 		first = first || time
 		while(true) {
 			var last = time; time = ping_function.next(time)
@@ -259,7 +252,7 @@ var main = function(){
 			print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',pad(format_dur(time-last),' ',9),'avg',format_dur((time-first)/count),'tot',format_dur(time-first))
 
 			if (time < now()-rc.retro_threshold)
-				ping_file.append(rc.f,{time:time, period:rc.period, tags:'afk RETRO'})
+				ping_file.append(rc.ping_file,{time:time, period:rc.period, tags:'afk RETRO'})
 			else
 				prompt_for_ping(time)
 			}
@@ -285,11 +278,11 @@ var ping_process = function(time){
 		print(divider(''))
 		print()
 		}
-	var last_doing = ping_file.last(rc.f).tags
+	var last_doing = ping_file.last(rc.ping_file).tags
 	print("It's tag time! What are you doing RIGHT NOW ("+m(time*1000).format('HH:mm:ss')+')?')
 	print('Ditto ('+cyan('"')+') to repeat prev tags:',cyan(last_doing))
 	var t; var tags = (t=read_line_stdin().trim())==='"'? last_doing : t
-	ping_file.append(rc.f,{time:time, period:rc.period, tags:tags})
+	ping_file.append(rc.ping_file,{time:time, period:rc.period, tags:tags})
 	tt_sync()
 	process.exit()
 	}
@@ -300,7 +293,7 @@ var tt_sync = function(){
 	}
 var sync_bee = function(){
 	// the log file → [{time: period: tags:}]
-	var logfile_pings = function(){return ping_file.all(rc.f)}
+	var logfile_pings = function(){return ping_file.all(rc.ping_file)}
 	// beeminder api datapoints → [{time: period: tags: id: group:}]
 	var beeminder_pings = function(datapoints){
 		return _.flatten(datapoints.filter(function(v){return v.value!==0}).filter(function(v){return v.comment!=='fake'}).map(function(v){
@@ -391,12 +384,12 @@ var sync_bee = function(){
 	}
 
 var merge = function(fl){
-	print('merging',path_resolve(fl),'into',path_resolve(rc.f))
-	if (!args.dry_run) ping_file.write(rc.f,_.sortBy(ping_file.all(rc.f).concat(ping_file.all(fl)),'time')) }
+	print('merging',fs(fs(fl).realpath()).path,'into',fs(fs(rc.ping_file).realpath()).path)
+	if (!args.dry_run) ping_file.write(rc.ping_file,_.sortBy(ping_file.all(rc.ping_file).concat(ping_file.all(fl)),'time')) }
 
 //===----------------===// call function based on args //===---------------===//
 
-if (module.parent) err("oh my goodness, so sorry, but, tagtime.js isn't built to be require()'d!")
+if (module.parent) print("oh my goodness, so sorry, but, tagtime.js isn't built to be require()'d!")
 
 switch (args._[0]) {
 case undefined     : main(); break

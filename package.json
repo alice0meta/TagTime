@@ -3,7 +3,6 @@
 		"async": "*",
 		"sync": "*",
 		"minimist": "*",
-		"mkdirp": "*",
 		"underscore": "*",
 		"moment": "*"
 	}
