@@ -60,12 +60,11 @@ sync(err_print(function(){
 var args = minimist(argv._,{alias:{dry_run:['d','dry','dry-run'],settings:'s'}, default:{settings:'~/.tagtime-rc'}})
 
 if (!fs(args.settings).exists()) {
-	fs(args.settings).$ = fs('settings.js').$
+	fs(args.settings).$ = fs('settings.js').$+'' //! wtf
 	print("hey! I've put a settings file at",args.settings,"for you. Go fill it in and rerun tagtime!")
-	setTimeout(function(){process.exit()},200) //! wtf
-	}
+	process.exit() }
 
-var rc = eval('('+fs(args.settings).$+')')
+var rc = eval(';('+fs(args.settings).$+')')
 
 if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:',rc.period+')'); process.exit(1)}
 if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) {print('ERROR: seeds probably should be positive, not too close to each other, and not too big (seed:',rc.seed+'). How about',(1000 + Math.round(Math.random()*2000))+'?'); process.exit(1)}
