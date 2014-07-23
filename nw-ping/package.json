@@ -1,0 +1,15 @@
+{
+  "name": "nw-ping",
+  "main": "index.html",
+  "window": {
+    "frame": false,
+    "always-on-top": true,
+    "min_width": 20,
+    "min_height": 20,
+    "show": false
+  },
+  "dependencies": {
+    "jquery": "^2.1.1",
+    "moment": "^2.7.0"
+  }
+}
