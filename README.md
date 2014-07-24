@@ -25,7 +25,6 @@ That's why we call it "time-tracking for space cadets". -->
 # Installation and Quick Start
 
 1. Use osx.
-1. Install [node-webkit](https://github.com/rogerwang/node-webkit) to `/Applications`
 1. Create a local directory for TagTime to be installed at, and run `git clone https://github.com/alice0meta/TagTime.git` in it.
 1. In that directory, run `./run.sh`, and run it whenever you reboot your machine. This will probably output some error messages, but it's probably okay.
 1. If this is the first time you've run TagTime, open `~/.tagtime.js` and fill in the settings.

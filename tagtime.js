@@ -33,7 +33,6 @@ var _ = require('underscore')
 //===----------------------------===// ζ₀ //===----------------------------===//
 	global.fs = require('fs')
 	global.path = require('path')
-	global.chokidar = require('chokidar')
 	global.moment = require('moment')
 	global._ = require('underscore')
 	var mkdirp = require('mkdirp')
