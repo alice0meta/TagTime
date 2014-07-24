@@ -28,6 +28,7 @@ var _ = require('underscore')
 // pings_if(): skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level (current afk behavior is undesirable in many ways)
 	// okay, so just as is, but if you miss any pings it pops up the editor immediately?
 // maybe add the off autotag too
+// add an autoupdater
 
 //===----------------------------===// ζ₀ //===----------------------------===//
 	global.fs = require('fs')
@@ -286,7 +287,7 @@ var run_pings = function(){var t
 		sleep(1) } }
 
 var prompt = function(time){var t
-	var tags = exec.sync(null,rc.gui+' '+Math.round(time)+((t=ping_file.last(rc.p))&&(t=t.tags)!==''? ' -b '+t.b64() : '')).trim()
+	var tags = exec.sync(null,rc.gui+'/run.sh '+Math.round(time)+((t=ping_file.last(rc.p))&&(t=t.tags)!==''? ' -b '+t.b64() : '')).trim()
 	ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
 	}
 
