@@ -25,10 +25,9 @@ var _ = require('underscore')
 // ??sortedness of log files??
 // notes on danny's tagtime workflow: when entering tags, <enter> with no characters will just go straight to the editor. xterm mechanics is just that tagtime calls xterm with appropriate arguments and then is a running program in xterm. and then can optionally call editors and stuff.
 // bah, fuck, i ate the timezone information again. fix?
-
-// todo before danny:
 // pings_if(): skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level (current afk behavior is undesirable in many ways)
 	// okay, so just as is, but if you miss any pings it pops up the editor immediately?
+// maybe add the off autotag too
 
 //===----------------------------===// ζ₀ //===----------------------------===//
 	global.fs = require('fs')
