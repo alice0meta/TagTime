@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 if [ ! -f installed ]; then
+	ruby -e "$(curl -fsSL https://raw.github.com/Homebrew/homebrew/go/install)"
+	brew update
 	brew install node
 	npm install forever -g
 	npm install

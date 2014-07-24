@@ -26,15 +26,6 @@ That's why we call it "time-tracking for space cadets". -->
 
 1. Use osx.
 
-1. Clone the repository to a directory on your local machine:
-
-		git clone https://github.com/alice0meta/TagTime.git
-
-1. Install [homebrew](http://brew.sh/):
-
-		ruby -e "$(curl -fsSL https://raw.github.com/Homebrew/homebrew/go/install)"
-		brew update
-
 1. Install [node-webkit](https://github.com/rogerwang/node-webkit) to `/Applications` and add it to `/usr/local/bin`:
 
 		# adds node-webkit to /usr/local/bin
@@ -44,9 +35,13 @@ That's why we call it "time-tracking for space cadets". -->
 		/Applications/node-webkit.app/Contents/MacOS/node-webkit $@
 		EOL
 
+1. Clone the repository to a directory on your local machine:
+
+		git clone https://github.com/alice0meta/TagTime.git
+
 1. Go to the repository's folder.
 
-1. Run `./run.sh`.
+1. Run `./run.sh`. This will probably output some error messages, but it's probably okay.
 
 1. Open `~/.tagtime.js` and fill in the settings.
 
