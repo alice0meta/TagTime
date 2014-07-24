@@ -12,6 +12,11 @@ See [messymatters.com/tagtime](http://messymatters.com/tagtime) for the whole st
 * `run.sh` - installs dependencies the first time, runs `tagtime.js` as a daemon with own arguments
 * `stop.sh` - stops existing instances of the daemon
 * `settings.js` - template for user-specific settings
+* `TagTime v0 perl/` - Original TagTime
+* `TagTime v0 python/` - initial work on a new back-end for TagTime contributed by Jonathan Chang and Arthur Breitman
+* `TagTime v0 android/` - the TagTime Android app by Bethany Soule (bsoule) with contributions by Michael Janssen (jamuraa).
+
+Thanks also to Paul Fenwick, Jesse Aldridge, Kevin Lochner, and Rob Felty for contributions to the code.
 
 <!-- The script directory contains various scripts we've used, like for various games and contests and commitment contracts and whatnot.
 Basically, incentive schemes for getting ourselves to procrastinate less.
@@ -19,12 +24,6 @@ We view TagTime as the foundation for all such lifehacks, since it's a way to gu
 It's hard to flake out on reporting to TagTime since it actively pings you.
 You can be perfectly passive - just responding when prompted.
 That's why we call it "time-tracking for space cadets". -->
-
-* `TagTime v0 perl` - Original TagTime
-* `TagTime v0 python` - initial work on a new back-end for TagTime contributed by Jonathan Chang and Arthur Breitman
-* `TagTime v0 android` - the TagTime Android app by Bethany Soule (bsoule) with contributions by Michael Janssen (jamuraa).
-
-<!-- Thanks also to Paul Fenwick, Jesse Aldridge, Kevin Lochner, and Rob Felty for contributions to the code. -->
 
 # Installation and Quick Start
 
