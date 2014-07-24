@@ -2,13 +2,51 @@ To determine how you spend your time, TagTime literally randomly samples you. At
 
 See [messymatters.com/tagtime](http://messymatters.com/tagtime) for the whole story.
 
-# Code
+## Installation and Quick Start
+
+1. If you're not using osx, try [TagTime v0](https://github.com/alice0meta/TagTime/tree/master/TagTime%20v0%20perl) for now.
+1. Pick a directory to put the TagTime installation in, and run `git clone https://github.com/alice0meta/TagTime.git; cd TagTime; ./run.sh`.
+1. If this is the first time you've run TagTime, open `~/.tagtime.js` and fill in the settings.
+1. And then run `./run.sh` in that directory again whenever you reboot your machine.
+1. Answer the pings! (Always answer with what it caught you at right at that moment)
+
+<!-- ## Advanced Usage
+
+How to make the tagtime daemon automatically start on bootup in OSX:
+
+sudo ln -s /path/to/tagtimed.pl /Library/StartupItems/tagtimed.pl -->
+
+## The Math
+
+If your tagtime gap is g minutes then the probability of at least one ping in any x minute window is 1-e^(-x/g).
+The window corresponding to probability p is -g×ln(1-p).
+For example, with g=45, there's a 10% chance of getting pinged in any window of duration 4 minutes 44 seconds.
+There's a 50% chance of getting pinged within 31 minutes.
+There's a 99% chance of a ping within 3.5 hours.
+The probability of waiting over 10 hours for a ping is one in a million.
+
+## Beeminder Integration
+
+To set up TagTime to automatically send reports to [Beeminder](http://www.beeminder.com/), first set up a goal there. Copy the `username/slug` and plug it into your `~/tagtime.js` file.
+Each goal on Beeminder will track a collection of one or more tags on TagTime. See `~/tagtime.js` for more details.
+
+## Android App
+
+There is an Android app available [on Google Play](https://play.google.com/store/apps/details?id=bsoule.tagtime).
+The source and build instructions are in `TagTime v0 android`.
+
+## Google Group
+
+For discussion and questions: [TagTime Google Group](https://groups.google.com/forum/?fromgroups#!forum/tagtime).
+
+## Code
 
 * `tagtime.js` - desktop daemon, beeminder synchonization, pingfile merging
 * `ping-nw/` - node-webkit gui
 * `run.sh` - installs dependencies the first time, runs `tagtime.js` as a daemon with own arguments
 * `stop.sh` - stops existing instances of the daemon
 * `settings.js` - template for user-specific settings
+
 * `TagTime v0 perl/` - Original TagTime <!-- by ... who? -->
 * `TagTime v0 python/` - initial work on a new back-end for TagTime contributed by Jonathan Chang and Arthur Breitman
 * `TagTime v0 android/` - the TagTime Android app by Bethany Soule (bsoule) with contributions by Michael Janssen (jamuraa).
@@ -21,39 +59,3 @@ We view TagTime as the foundation for all such lifehacks, since it's a way to gu
 It's hard to flake out on reporting to TagTime since it actively pings you.
 You can be perfectly passive - just responding when prompted.
 That's why we call it "time-tracking for space cadets". -->
-
-# Installation and Quick Start
-
-1. Use osx.
-1. Create a local directory for TagTime to be installed at, and run `git clone https://github.com/alice0meta/TagTime.git` in it.
-1. In that directory, run `./run.sh`, and run it whenever you reboot your machine. This will probably output some error messages, but it's probably okay.
-1. If this is the first time you've run TagTime, open `~/.tagtime.js` and fill in the settings.
-1. Answer the pings! (Always answer with what it caught you at right at that moment)
-
-<!-- # Extra Features
-
-Editor: If you hit enter instead of answering the ping it will open up theeditor.
--->
-
-# The Math
-
-If your tagtime gap is g minutes then the probability of at least one ping in any x minute window is 1-e^(-x/g).
-The window corresponding to probability p is -g×ln(1-p).
-For example, with g=45, there's a 10% chance of getting pinged in any window of duration 4 minutes 44 seconds.
-There's a 50% chance of getting pinged within 31 minutes.
-There's a 99% chance of a ping within 3.5 hours.
-The probability of waiting over 10 hours for a ping is one in a million.
-
-# Beeminder Integration
-
-To set up TagTime to automatically send reports to [Beeminder](http://www.beeminder.com/), first set up a goal there. Copy the `username/slug` and plug it into your `~/tagtime.js` file.
-Each goal on Beeminder will track a collection of one or more tags on TagTime. See `~/tagtime.js` for more details.
-
-# Android App
-
-There is an Android app available [on Google Play](https://play.google.com/store/apps/details?id=bsoule.tagtime).
-The source and build instructions are in `TagTime v0 android`.
-
-# Google Group
-
-For discussion and questions: [TagTime Google Group](https://groups.google.com/forum/?fromgroups#!forum/tagtime).
