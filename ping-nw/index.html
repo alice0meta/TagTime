@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+	/* behavior */
+	body {margin:8px; overflow-y:hidden; white-space:nowrap;}
+	body {-webkit-app-region:drag;} .expando_input, button {-webkit-app-region:no-drag;}
+	#body {display:inline-block;}
+	
+	/* element defn */
+	.expando_input {display:table-cell;}
+
+	/* style */
+	p {margin:0;}
+	body, button, .expando_input {background-color:#222; color:#fff; font-family:Monaco,monospace; font-size:12px; outline:none;}
+	button {background-color:#333; border:1px solid #666; cursor:pointer;}
+	button.inline {margin:-1px -3px; padding:0 2px;}
+	.tagstr {color:#0ff;}
+	.warning {background-color:#b00; color:#ffd700; margin:0 -100% 4px; padding:0 100%; text-align: center;}
+	.warning_outer {max-width:100%; overflow-x:hidden; margin:0 -8px; padding:0 8px;}
+</style></head><script>
+	var gui = require('nw.gui')
+	var m = require('moment')
+	var $ = require('jquery')
+	var Window = gui.Window.get()
+	var exec = require('child_process').exec
+	var argv = gui.App.argv
+
+	var W = document.write.bind(document)
+	var print = function(){process.stdout.write(Array.prototype.slice.call(arguments).join(' ')+'\n')}
+	$.prototype.focus_end = function(){var t = document.createRange(); t.selectNodeContents(this[0]); t.collapse(false); var u = window.getSelection(); u.removeAllRanges(); u.addRange(t)}
+	String.prototype.b64 = function(){return typeof(Buffer)==='undefined'? window.btoa(unescape(encodeURIComponent(this+''))) : new Buffer(this+'').toString('base64')}
+	String.prototype.unb64 = function(){return typeof(Buffer)==='undefined'? decodeURIComponent(escape(window.atob(this+''))) : new Buffer(this+'','base64').toString('utf-8')}
+
+	var time = parseInt(argv[0])
+	var last_doing = argv[1] && (argv[1]==='-b'&&argv[2]? argv[2].unb64() : argv[1])
+	var late = time + 10 <= m()/1000
+</script><body><div id='body'>
+	<script>if (late) W('<div class="warning_outer"><div class="warning">!! this popup is '+Math.round(m()/1000-time)+' seconds late !!</div></div>')</script>
+	<p>It's tag time! What are you doing RIGHT NOW (<script>W(m(time*1000).format('HH:mm:ss'))</script>)?</p>
+	<script>if (last_doing) W('<p>Ditto <button id=ditto class="inline">(<span class="tagstr">"</span>)</button> to repeat prev tags: <span class="tagstr">'+last_doing+'</span></p>')</script>
+	<div style="margin:5px"><div id=tags class="expando_input tagstr" contenteditable="true"></div></div>
+</div></body></html><script>
+	$('#tags').focus()
+	$('#tags').on('click',function(e){e.stopPropagation()})
+	$(document).on('click',function(e){$('#tags').focus_end()})
+
+	var output_and_close = function(v){var t; print((t=v||$('#tags').text())==='"'? last_doing : t); Window.close()}
+	$('#tags').keypress(function(e){if (e.which == 13) output_and_close()})
+	$('#ditto').on('click',function(){output_and_close('"')})
+
+	var t = new gui.Menu({type:'menubar'})
+		t.createMacBuiltin('TagTime')
+		t.items[2].submenu.append(new gui.MenuItem({label:'DevTools', key:'i', modifiers:'cmd-alt',
+			click:function(){Window.isDevToolsOpen()? Window.closeDevTools() : Window.showDevTools()}}))
+		Window.menu = t
+	var x;var y; Window.resizeTo(x=$('#body').width()+16,y=$('body').height()+16)
+	Window.moveTo(Math.round((window.screen.width-x)/2),Math.round((window.screen.height-y)/2))
+	Window.setResizable(false)
+	$(document).ready(function(){setTimeout(function(){
+		new Audio('loud-ding.wav').play()
+		Window.show(); Window.focus()
+		setTimeout(function(){exec('say "one does not simply tag their time"')
+			setTimeout(function(){exec('say "what if i tagged my time?"')}
+		,40*1000)},20*1000)
+	},200)})
+</script>

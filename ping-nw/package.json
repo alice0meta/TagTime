@@ -1,5 +1,5 @@
 {
-  "name": "nw-ping",
+  "name": "ping-nw",
   "main": "index.html",
   "window": {
     "frame": false,
