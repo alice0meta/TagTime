@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 cd $(dirname "${BASH_SOURCE[0]}")
 
-rm bin.nw
-zip -r bin.nw *
+rm bin.nw &>/dev/null
+zip -r bin.nw * &>/dev/null
 node-webkit bin.nw "$@"

@@ -16,7 +16,7 @@
 	//grouping: false, // have a datapoint for each ping
 	//grouping: 'bob/play bob/work', // group pings for bob/play and bob/work but not any others
 
-	retro_threshold: 60, // pings from more than this many seconds ago get autologged with tags "afk" and "RETRO". (Pings can be overdue either because the computer was off or tagtime was waiting for you to answer a previous ping.)
+	retro_threshold: 60, // pings from more than this many seconds ago get autologged with tags "afk" and "RETRO". (Pings can be overdue either because tagtime wasn't running or tagtime was waiting for you to answer a previous ping.)
 	seed: 666, // for pings not in sync with other peoples' pings, change this
 	gui: 'ping-nw', // options: ping-nw, ping-term //! note: ping-term is not yet implemented
 	editor: '', //! todo: implement // "CHANGEME if you don't like vi (eg: /usr/bin/pico)"

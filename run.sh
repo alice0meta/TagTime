@@ -17,5 +17,5 @@ EOL
 	echo "tagtime has been installed" > installed
 fi
 
-./stop.sh
-forever start -a -l forever.txt -o ~/.forever/tt_out.txt -e ~/.forever/tt_err.txt --minUptime 1000ms --spinSleepTime 20s tagtime.js $@
+forever stop tagtime.js
+forever start -a -l tagtime.log --minUptime 1000ms --spinSleepTime 20s tagtime.js "$@"

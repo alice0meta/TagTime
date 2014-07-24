@@ -149,11 +149,11 @@ var log_io = function(f){return function(){var a = Array.prototype.slice.apply(a
 //===-------------===// ping file parser and stringifier //===-------------===//
 
 var ping_file = (function(){
-	// log format is: 2014-03-26/19:51:56-07:00p22.5 a b c (a:blah)
+	// log format is: 2014-03-26/19:51:56-07:00‹p22.5›? a b c (a:blah)
 	var format = 'YYYY-MM-DD/HH:mm:ssZ'
 	var parse = function(v){
 		if (v.match(/^....-/)) {var t = v.match(/^([^\sp]+)(p\S+)? (.*)$/); return {time:m.utc(t[1],format)/1000, period:t[2]? parseFloat(t[2]):45, tags:t[3].trim()}}
-		else {var t = v.match(/^(\d+)([^\[]+)/); return {time:i(t[1]), period:rc.period, tags:t[2].trim()}}
+		else {var t = v.match(/^(\d+)([^\[]+)/); if (!t) err('bad log file'); return {time:i(t[1]), period:rc.period, tags:t[2].trim()}}
 		}
 	var stringify = function(v){return m(v.time*1000).format(format)+(v.period===45?'':'p'+v.period)+' '+v.tags}
 	var read_nonblank_lines = function(fl){return fs(fl).$.split('\n').filter(function(v){return v!==''})}

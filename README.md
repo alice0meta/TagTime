@@ -9,7 +9,7 @@ See [messymatters.com/tagtime](http://messymatters.com/tagtime) for the whole st
 * `run.sh` - installs dependencies the first time, runs `tagtime.js` as a daemon with own arguments
 * `stop.sh` - stops existing instances of the daemon
 * `settings.js` - template for user-specific settings
-* `TagTime v0 perl/` - Original TagTime
+* `TagTime v0 perl/` - Original TagTime <!-- by ... who? -->
 * `TagTime v0 python/` - initial work on a new back-end for TagTime contributed by Jonathan Chang and Arthur Breitman
 * `TagTime v0 android/` - the TagTime Android app by Bethany Soule (bsoule) with contributions by Michael Janssen (jamuraa).
 
@@ -34,8 +34,7 @@ That's why we call it "time-tracking for space cadets". -->
 <!-- # Extra Features
 
 Editor: If you hit enter instead of answering the ping it will open up theeditor.
-
-1. If the daemon is sad, end it with `./stop.sh`. -->
+-->
 
 # The Math
 
