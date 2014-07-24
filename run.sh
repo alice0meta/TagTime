@@ -7,6 +7,13 @@ if [ ! -f installed ]; then
 	npm install forever -g
 	npm install
 	cd ping-nw; npm install; cd ..
+
+	mk() { cat >"$1"; chmod -R 755 "$1" &>/dev/null; }
+mk /usr/local/bin/node-webkit <<'EOL'
+#!/usr/bin/env bash
+/Applications/node-webkit.app/Contents/MacOS/node-webkit $@
+EOL
+
 	echo "tagtime has been installed" > installed
 fi
 

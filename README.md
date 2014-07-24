@@ -25,28 +25,12 @@ That's why we call it "time-tracking for space cadets". -->
 # Installation and Quick Start
 
 1. Use osx.
-
-1. Install [node-webkit](https://github.com/rogerwang/node-webkit) to `/Applications` and add it to `/usr/local/bin`:
-
-		# adds node-webkit to /usr/local/bin
-		mk() { cat >"$1"; chmod -R 755 "$1" &>/dev/null; }
-		mk /usr/local/bin/node-webkit <<'EOL'
-		#!/usr/bin/env bash
-		/Applications/node-webkit.app/Contents/MacOS/node-webkit $@
-		EOL
-
-1. Clone the repository to a directory on your local machine:
-
-		git clone https://github.com/alice0meta/TagTime.git
-
+1. Install [node-webkit](https://github.com/rogerwang/node-webkit) to `/Applications`
+1. Clone the repository to a directory on your local machine, with `git clone https://github.com/alice0meta/TagTime.git`
 1. Go to the repository's folder.
-
 1. Run `./run.sh`. This will probably output some error messages, but it's probably okay.
-
 1. Open `~/.tagtime.js` and fill in the settings.
-
 1. Answer the pings! (Always answer with what it caught you at right at that moment)
-
 1. If the daemon is sad, end it with `./stop.sh`.
 
 <!-- # Extra Features
