@@ -308,11 +308,11 @@ var sync_bee = function(){
 	var tagdsl_eval = function(f,tags){
 		f = f.split(' ')
 		var check = function(v){return tags.split(/ +/).some(function(t){return t===v})}
-		var first_next = function(f){return f[0]==='not'? [!check(f[1]),f.slice(2)] : [check(f[0]), f.slice(1)]}
+		var first_next = function(f){return f[0]==='¬'||f[0]==='!'? [!check(f[1]),f.slice(2)] : [check(f[0]), f.slice(1)]}
 		var v = first_next(f); while (true) {
 			if (v[1].length===0) return v[0]
-			else if (v[1][0].toLowerCase()==='and') {var t = first_next(v[1].slice(1)); v = [v[0]&&t[0],t[1]]}
-			else if (v[1][0].toLowerCase()==='or' ) {var t = first_next(v[1].slice(1)); v = [v[0]||t[0],t[1]]}
+			else if (v[1][0].toLowerCase()==='&') {var t = first_next(v[1].slice(1)); v = [v[0]&&t[0],t[1]]}
+			else if (v[1][0].toLowerCase()==='|') {var t = first_next(v[1].slice(1)); v = [v[0]||t[0],t[1]]}
 			else {print('oh no, bad tag dsl!',f); throw 'BAD_TAG_DSL'}
 			} }
 
