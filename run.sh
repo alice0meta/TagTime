@@ -14,7 +14,7 @@ main() {
 		if [ "$ver" != "" ]; then
 			echo "updating: $ver"
 			git pull -q
-			if [ -f "update.sh" ]; then t="$(update.sh)"; if [ "$t" = "exit" ]; then exit 0; fi; fi
+			if [ -f "update.sh" ]; then update.sh; exit 0; fi
 			gen_tt_nw
 		fi
 	fi
