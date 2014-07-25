@@ -29,9 +29,8 @@ var exec = require('child_process').exec
 // fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
 // implement editor environment variable: editor: '', //! todo: implement // "CHANGEME if you don't like vi (eg: /usr/bin/pico)"
 // handle Cancel as different from Enter
-// just send the pings to a logfile
 
-//===----------------------------===// ζ₀ //===----------------------------===//
+//===----------------------------===// ζ₀ //===----------------------------===//!
 	global.fs = require('fs')
 	global.path = require('path')
 	global.moment = require('moment')
@@ -61,7 +60,7 @@ var exec = require('child_process').exec
 	global.ζ0_memb_Emod_obj = function(o,m,f){o[m] = f(o[m]); return o}
 	Array.prototype.ζ0_concat = function(){return Array.prototype.concat.apply([],this)}
 	global.ζ0_int = function(v){return parseInt(v)}
-//===--===// other copypasted (gitminder, α, stopwatch, index.html) //===--===//
+//===---===// other copypasted (lang-alpha, stopwatch, daemon.html) //===--===//!
 	var merge_o = function(a,b){var r = {}; Object.keys(a).forEach(function(k){r[k] = a[k]}); Object.keys(b).forEach(function(k){r[k] = b[k]}); return r}
 	var seq = function(v){return typeof v === 'string'? v.split('') : v instanceof Array? v : Object.keys(v).map(function(k){return [k,v[k]]})}
 	var frequencies = function(v){return v.reduce(function(r,v){r[v] = v in r? r[v]+1 : 1; return r},{})}
@@ -74,7 +73,7 @@ var exec = require('child_process').exec
 		var d = Math.floor(v/60/60/24), h = Math.floor(v/60/60)%24, m = Math.floor(v/60)%60, s = v%60
 		return [d+'d',pad(h+'','0',2)+'h',pad(m+'','0',2)+'m',pad(s+'','0',2)+'s'].slice(d>0?0:h>0?1:m>0?2:3).join('')}
 	Array.prototype.m_concat = function(){return Array.prototype.concat.apply([],this)}
-	var print = function(){process.stdout.write(Array.prototype.slice.call(arguments).join(' ')+'\n')}
+	var print = function(){process.stdout.write(Array.prototype.slice.call(arguments).join(' ')+'\n'); return arguments[arguments.length-1]}
 
 //===---------------------------===// util //===---------------------------===//
 
@@ -116,7 +115,7 @@ var https = require('https')
 var request = function(method,path,query,headers,cb){
 	var t = path.match(/^(https?):\/\/(.*)$/); var http_ = t[1] === 'http'? http : https; path = t[2]
 	var t = path.match(/^(.*?)(\/.*)$/); var host = t[1]; path = t[2]
-	query = seq(query).map(function(v){return v[0]+'='+v[1]}).join('&')
+	query = seq(query).map(function(v){return encodeURIComponent(v[0])+'='+encodeURIComponent(v[1])}).join('&')
 	path = path+(query===''?'':'?'+query)
 	http_.request({host:host,path:path,headers:headers,method:method},function(resp){
 		var t = []; resp.on('data', function(chunk){t.push(chunk)}); resp.on('end', function(){
