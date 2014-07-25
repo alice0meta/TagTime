@@ -7,9 +7,8 @@ If you're not using OSX, try [TagTime v0](https://github.com/alice0meta/TagTime/
 ## Installation and Quick Start
 
 1. Run `cd ~; git clone https://github.com/alice0meta/TagTime.git; TagTime/run.sh` in a terminal.
-1. If this is the first time you've run TagTime, open `~/.tagtime.js` and fill in the settings.
-1. And run `~/TagTime/run.sh` in a terminal again each time after you reboot your machine.
 1. Answer the pings! (Always answer with what it caught you at right at that moment)
+1. Run `~/TagTime/run.sh` in a terminal again each time after you reboot your machine.
 
 <!-- ## Advanced Usage
 
