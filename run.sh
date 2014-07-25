@@ -29,4 +29,5 @@ fi
 # git pull -q
 #//! check if it's updated and rebuild appropriate things
 
+kill $(pgrep -f tagtime) 2>/dev/null
 bin/node-webkit.app/Contents/MacOS/node-webkit bin/tagtime.nw "$@"
