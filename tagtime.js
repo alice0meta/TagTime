@@ -16,6 +16,7 @@ var _ = require('underscore')
 // okay. so we can't find a closed form. so our ping algorithm is probably ridiculously overcomplicated, geez. decomplicate it!
 	// maybe refactor ping algorithm *again* to avoid maintaining state
 // make sure parens are implemented correctly
+// consider reenabling seed: 666, // for pings not in sync with other peoples' pings, change this
 
 // todo:
 // ‽ make this into a webapp hosted on github?
@@ -89,8 +90,10 @@ if (!fs(args.settings).exists()) {
 
 var rc = eval(';({'+fs(args.settings).$+'})')
 
-if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:',rc.period+')'); process.exit(1)}
-if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) {print('ERROR: seeds probably should be positive, not too close to each other, and not too big (seed:',rc.seed+'). How about',(1000 + Math.round(Math.random()*2000))+'?'); process.exit(1)}
+if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:',rc.period+')'); process.exit(1)} //!
+
+rc.seed = Math.round(Math.random()*2200) + 800
+// if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) {print('ERROR: seeds probably should be positive, not too close to each other, and not too big (seed:',rc.seed+'). How about',(1000 + Math.round(Math.random()*2000))+'?'); process.exit(1)}
 
 rc.p = rc.ping_file
 if (!fs(rc.p).exists()) fs(rc.p).$ = ''
@@ -254,8 +257,10 @@ var ping_function = (function(){
 	return {
 		// time → nearest ping time ≤ time
 		le: function(time){while (get() > time) reset_before(time); while (get() <= time) next(); prev(); if (get()!==pings_old.le(time)) err('oh dear ≤.',time,pings_old.le(time),get()); /*print('≤',seqs);*/ return get()},
+		gt: function(time) {var r = ping_function.le(time); while ((r=ping_function.next(r)) <= last) {}; return r}
 		//??
 		next: function(time){next(); if (get()!==pings_old.next(time)) err('oh dear >.',time,pings_old.next(time),get()); /*print('>',seqs);*/ return get()},
+		prev: function(){prev(); return get()},
 	} })()
 
 //===--===// fns loosely corresponding to the original architecture //===--===//
@@ -267,7 +272,7 @@ var run_pings = function(){var t
 	var first
 	var count = 0
 	while (true) {
-		var time = ping_function.le((t=ping_file.last(rc.p))? t.time : now())
+		var time = ping_function.gt(((t=ping_file.last(rc.p))&&t.time) || now()); time = ping_function.prev()
 		first = first || time
 		while(true) {
 			var last = time; time = ping_function.next(time)
