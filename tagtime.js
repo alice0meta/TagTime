@@ -279,15 +279,13 @@ var run_pings = function(){var t
 				ping_file.append(rc.p,{time:time, period:rc.period, tags:'afk RETRO'})
 				setTimeout(λ,0)
 			} else {
-				print('prompting!')//~
 				prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags},function(tags){
-					print('got tags',tags)//~
 					ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
 					tt_sync()
 					setTimeout(λ,0)
 				})
 			}
-			})
+			})()
 		setTimeout(λ,100)
 		})() }
 

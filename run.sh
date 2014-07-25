@@ -33,6 +33,7 @@ main() {
 
 	if [ "$(cmp-version)" = "lesser" ]; then
 		git pull -q
+		if [ -f "update.sh" ]; then ./update.sh; fi
 		gen_tt_nw
 	fi
 
