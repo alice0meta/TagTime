@@ -15,7 +15,7 @@ var exec = require('child_process').exec
 	// maybe refactor ping algorithm *again* to avoid maintaining state
 // make sure parens are implemented correctly
 // consider reenabling seed: 666, // for pings not in sync with other peoples' pings, change this
-// improve the autoupdater
+// improve the autoupdater: make it more robust, more convenient, and check for updates more frequently than just every time it runs
 
 // todo:
 // ‽ make this into a webapp hosted on github?
@@ -266,27 +266,25 @@ var run_pings = function(){var t
 
 	var first
 	var count = 0
-	;(function λ(){
-		var time = ping_function.gt(((t=ping_file.last(rc.p))&&t.time) || now()); time = ping_function.prev()
+	;(function λ(time){
+		//! bah, this local structure is ridiculous. refactor it!
+		if (!time) {time = ping_function.gt(((t=ping_file.last(rc.p))&&t.time) || now()); time = ping_function.prev()}
 		first = first || time
-		;(function λ(){
-			var last = time; time = ping_function.next(time)
-			if (!(time <= now())) return
+		var last = time; time = ping_function.next(time)
+		if (!(time <= now())) {setTimeout(λ,100); return}
 
-			print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',pad(format_dur(time-last),' ',9),'avg',format_dur((time-first)/count),'tot',format_dur(time-first))
+		print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',pad(format_dur(time-last),' ',9),'avg',format_dur((time-first)/count),'tot',format_dur(time-first))
 
-			if (time < now() - 60) {
-				ping_file.append(rc.p,{time:time, period:rc.period, tags:'afk RETRO'})
-				setTimeout(λ,0)
-			} else {
-				prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags},function(tags){
-					ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
-					tt_sync()
-					setTimeout(λ,0)
-				})
-			}
-			})()
-		setTimeout(λ,100)
+		if (time < now() - 60) {
+			ping_file.append(rc.p,{time:time, period:rc.period, tags:'afk RETRO'})
+			setTimeout(λ,0,time)
+		} else {
+			prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags},function(tags){
+				ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
+				tt_sync()
+				setTimeout(λ,0,time)
+			})
+		}
 		})() }
 
 var prompt // defined in main
