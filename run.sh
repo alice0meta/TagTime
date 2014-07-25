@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 cd $(dirname "${BASH_SOURCE[0]}")
+PATH="/usr/local/bin:$PATH:.:./node_modules/.bin"
 
 mk() { cat >"$1"; chmod -R 755 "$1" &>/dev/null; }
 
@@ -8,6 +9,16 @@ stop() { t=$(pgrep -f tagtime); if [ "$t" ]; then echo "killing existing tagtime
 gen_tt_nw() { zip -FSrq bin/tagtime.nw daemon.html loud-ding.wav node_modules package.json ping.html settings.js tagtime.js; }
 
 main() {
+	if [ -f "./node_modules/.bin/cmp-version" ]; then
+		ver="$(cmp-version)"
+		if [ "$ver" != "" ]; then
+			echo "updating: $ver"
+			git pull -q
+			if [ -f "update.sh" ]; then t="$(update.sh)"; if [ "$t" = "exit" ]; exit 0; fi
+			gen_tt_nw
+		fi
+	fi
+
 	mkdir bin &>/dev/null
 
 	if [ ! -d bin/node-webkit.app ]; then
@@ -28,12 +39,6 @@ main() {
 			}
 			npm install >/dev/null
 		fi
-		gen_tt_nw
-	fi
-
-	if [ "$(cmp-version)" = "lesser" ]; then
-		git pull -q
-		if [ -f "update.sh" ]; then ./update.sh; fi
 		gen_tt_nw
 	fi
 
