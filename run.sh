@@ -6,7 +6,6 @@ if [ ! -d bin ]; then
 		type brew &>/dev/null || { ruby -e "$(curl -fsSL https://raw.github.com/Homebrew/homebrew/go/install)"; }
 		brew install node
 	}
-	# npm install forever -g #//! global installation, really now
 	npm install
 
 	mkdir bin
@@ -19,13 +18,10 @@ if [ ! -d bin ]; then
 	rm "$nw_name.zip"
 	rm -r "$nw_name"
 
-	zip -FSrq bin/tagtime.nw package.json index.html ping.html loud-ding.wav node_modules settings.js tagtime.js
+	cd src; zip -FSrq ../bin/tagtime.nw *; cd ..
 fi
 
 # git pull -q
-# check if it's updated and rebuild appropriate things
+#//! check if it's updated and rebuild appropriate things
 
 bin/node-webkit.app/Contents/MacOS/node-webkit bin/tagtime.nw "$@"
-
-# forever stop tagtime.js
-# forever start -a -l tagtime.log --minUptime 1000ms --spinSleepTime 20s tagtime.js "$@"
