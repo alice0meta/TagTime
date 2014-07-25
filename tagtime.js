@@ -27,6 +27,7 @@ var _ = require('underscore')
 	// okay, so just as is, but if you miss any pings it pops up the editor immediately?
 // maybe add the off autotag too
 // add an autoupdater
+// fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file.
 
 //===----------------------------===// ζ₀ //===----------------------------===//
 	global.fs = require('fs')
@@ -86,7 +87,7 @@ if (!fs(args.settings).exists()) {
 	print("hey! I've put a settings file at",args.settings,"for you. Go fill it in and rerun tagtime!")
 	process.exit() }
 
-var rc = eval(';('+fs(args.settings).$+')')
+var rc = eval(';({'+fs(args.settings).$+'})')
 
 if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:',rc.period+')'); process.exit(1)}
 if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) {print('ERROR: seeds probably should be positive, not too close to each other, and not too big (seed:',rc.seed+'). How about',(1000 + Math.round(Math.random()*2000))+'?'); process.exit(1)}
