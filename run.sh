@@ -3,7 +3,7 @@ cd $(dirname "${BASH_SOURCE[0]}")
 
 mkdir bin &>/dev/null
 
-rm bin/tagtime.nw
+rm bin/tagtime.nw #//!
 
 if [ ! -d bin/node-webkit.app ]; then
 	nw_root="http://dl.node-webkit.org/v0.10.0/"

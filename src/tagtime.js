@@ -374,7 +374,7 @@ var sync_bee = function(){
 					logfile_pings().filter(function(v){return tagdsl_eval(rc.beeminder[user_slug],v.tags)}),
 					beeminder_pings(v))
 				}) }}) }}),
-		function(action_sets){
+		function(e,action_sets){
 			action_sets.map(function(v){
 				print(divider(' updating bmndr/'+v.user_slug+' '))
 				v.actions.msgs.map(function(v){print(v.slice(0,80))})
@@ -392,6 +392,7 @@ module.exports.main = function(args){
 	var argv = args.argv
 	switch (argv[0]) {
 		case undefined: run_pings(); break
+		case 'ping'   : prompt({time:i(argv[1]), last_doing:argv[2]}); break
 		case 'sync'   : tt_sync(); break
 		case 'merge'  : merge(argv[1]); break
 		case 'e'      : print(eval(argv.slice(1).join(' '))); break
