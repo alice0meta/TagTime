@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 cd $(dirname "${BASH_SOURCE[0]}")
 
+mk() { cat >"$1"; chmod -R 755 "$1" &>/dev/null; }
+
+stop() { t=$(pgrep -f tagtime); if [ "$t" ]; then echo "killing existing tagtime process $t"; kill "$t"; fi; }
+
+gen_tt_nw() { zip -FSrq bin/tagtime.nw daemon.html loud-ding.wav node_modules package.json ping.html settings.js tagtime.js; }
+
 main() {
 	mkdir bin &>/dev/null
 
@@ -22,18 +28,20 @@ main() {
 			}
 			npm install >/dev/null
 		fi
-		zip -FSrq bin/tagtime.nw daemon.html loud-ding.wav package.json ping.html settings.js tagtime.js
+		gen_tt_nw
 	fi
 
-	# git pull -q
-	#//! check if it's updated and rebuild appropriate things
+	if [ "$(cmp-version)" = "lesser" ]; then
+		git pull -q
+		gen_tt_nw
+	fi
 
-	t=$(pgrep -f tagtime); if [ "$t" ]; then echo "killing existing tagtime process $t"; kill "$t" 2>/dev/null; fi
-
+	stop
 	(bin/node-webkit.app/Contents/MacOS/node-webkit bin/tagtime.nw "$@" &)
 }
 
 case "$1" in
-	-r) rm bin/tagtime.nw; main;;
-	*) main;;
+	-r) rm bin/tagtime.nw; main "${@:2}";;
+	stop) stop;;
+	*) main "$@";;
 esac

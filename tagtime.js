@@ -15,6 +15,7 @@ var exec = require('child_process').exec
 	// maybe refactor ping algorithm *again* to avoid maintaining state
 // make sure parens are implemented correctly
 // consider reenabling seed: 666, // for pings not in sync with other peoples' pings, change this
+// improve the autoupdater
 
 // todo:
 // ‽ make this into a webapp hosted on github?
@@ -25,7 +26,6 @@ var exec = require('child_process').exec
 // pings_if(): skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level (current afk behavior is undesirable in many ways)
 	// okay, so just as is, but if you miss any pings it pops up the editor immediately?
 // maybe add the off autotag too
-// add autoupdating
 // fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
 // implement editor environment variable: editor: '', //! todo: implement // "CHANGEME if you don't like vi (eg: /usr/bin/pico)"
 // handle Cancel as different from Enter
@@ -279,7 +279,9 @@ var run_pings = function(){var t
 				ping_file.append(rc.p,{time:time, period:rc.period, tags:'afk RETRO'})
 				setTimeout(λ,0)
 			} else {
-				prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags},function(tags){				
+				print('prompting!')//~
+				prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags},function(tags){
+					print('got tags',tags)//~
 					ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
 					tt_sync()
 					setTimeout(λ,0)
