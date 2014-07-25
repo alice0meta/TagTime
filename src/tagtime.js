@@ -1,8 +1,8 @@
-var sync = require('sync')
 var async = require('async')
 var m = require('moment')
 var minimist = require('minimist')
 var _ = require('underscore')
+var exec = require('child_process').exec
 
 // todo back:
 // have read_graph cache its results
@@ -26,7 +26,9 @@ var _ = require('underscore')
 	// okay, so just as is, but if you miss any pings it pops up the editor immediately?
 // maybe add the off autotag too
 // add an autoupdater
-// fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file.
+// fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
+// implement editor environment variable: editor: '', //! todo: implement // "CHANGEME if you don't like vi (eg: /usr/bin/pico)"
+// handle Cancel as different from Enter
 
 //===----------------------------===// ζ₀ //===----------------------------===//
 	global.fs = require('fs')
@@ -34,7 +36,6 @@ var _ = require('underscore')
 	global.moment = require('moment')
 	global._ = require('underscore')
 	var mkdirp = require('mkdirp')
-	global.print = function(){console.log.apply(console,arguments); return arguments[arguments.length-1]}
 	String.prototype.repeat = function(v){return new Array(v+1).join(this)}
 	global.pad = function(v,s){return v+s.slice(v.length)}
 	global.argv = {_:process.argv.slice(4)}
@@ -59,7 +60,7 @@ var _ = require('underscore')
 	global.ζ0_memb_Emod_obj = function(o,m,f){o[m] = f(o[m]); return o}
 	Array.prototype.ζ0_concat = function(){return Array.prototype.concat.apply([],this)}
 	global.ζ0_int = function(v){return parseInt(v)}
-//===--------===// other copypasted (gitminder, α, stopwatch) //===--------===//
+//===--===// other copypasted (gitminder, α, stopwatch, index.html) //===--===//
 	var merge_o = function(a,b){var r = {}; Object.keys(a).forEach(function(k){r[k] = a[k]}); Object.keys(b).forEach(function(k){r[k] = b[k]}); return r}
 	var seq = function(v){return typeof v === 'string'? v.split('') : v instanceof Array? v : Object.keys(v).map(function(k){return [k,v[k]]})}
 	var frequencies = function(v){return v.reduce(function(r,v){r[v] = v in r? r[v]+1 : 1; return r},{})}
@@ -72,9 +73,18 @@ var _ = require('underscore')
 		var d = Math.floor(v/60/60/24), h = Math.floor(v/60/60)%24, m = Math.floor(v/60)%60, s = v%60
 		return [d+'d',pad(h+'','0',2)+'h',pad(m+'','0',2)+'m',pad(s+'','0',2)+'s'].slice(d>0?0:h>0?1:m>0?2:3).join('')}
 	Array.prototype.m_concat = function(){return Array.prototype.concat.apply([],this)}
+	var print = function(){process.stdout.write(Array.prototype.slice.call(arguments).join(' ')+'\n')}
 
-var err_print = function(f){return function(){try{f()} catch (e) {console.log('ERROR:',e,e.stack)}}}
-sync(err_print(function(){
+//===---------------------------===// util //===---------------------------===//
+
+var i = function(v){return parseInt(v)}
+var is = function(v){return v!==undefined}
+var err = function(v){print.apply(null,['#err#'].concat(arguments)); throw Error(v)}
+var pluralize = function(n,noun){return n+' '+noun+(n==1?'':'s')}
+var divider = function(v){ // 'foo' → '-----foo-----' of length 79
+	var left = Math.floor((79 - v.length)/2), right = 79 - left - v.length
+	return '-'.repeat(left)+v+'-'.repeat(right)}
+var editor = function(){return process.env.TAGTIME_EDITOR || process.env.EDITOR || 'open -a TextEdit'}
 
 //===-------------------===// get args and settings //===------------------===//
 
@@ -82,15 +92,17 @@ sync(err_print(function(){
 var args = minimist(argv._,{alias:{dry_run:['d','dry','dry-run'],settings:'s'}, default:{settings:'~/.tagtime.js'}})
 
 if (!fs(args.settings).exists()) {
-	fs(args.settings).$ = fs('settings.js').$+''
-	print("hey! I've put a settings file at",args.settings,"for you. Go fill it in and rerun tagtime!")
-	process.exit() }
+	fs(args.settings).$ = (fs('settings.js').$+'').replace(/‹([^›]+)›/g,function(_,v){var t; return is(t=eval(v))?t:''})
+	print("hey, I've put a settings file at",args.settings,"for you. Go fill it in!")
+	exec(editor()+" '"+fs(args.settings).realpath()+"'")
+}
 
-var rc = eval(';({'+fs(args.settings).$+'})')
+try{var rc = eval('({'+fs(args.settings).$+'\n})')}
+catch(e){print('ERROR: bad rc file:',e); process.exit(1)}
 
 if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:',rc.period+')'); process.exit(1)} //!
 
-rc.seed = Math.round(Math.random()*2200) + 800
+rc.seed = 666; //Math.round(Math.random()*2200) + 800
 // if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) {print('ERROR: seeds probably should be positive, not too close to each other, and not too big (seed:',rc.seed+'). How about',(1000 + Math.round(Math.random()*2000))+'?'); process.exit(1)}
 
 rc.p = rc.ping_file
@@ -112,7 +124,7 @@ var request = function(method,path,query,headers,cb){
 			cb(err,{json:json,string:t,response:resp}) }) }).end() }
 var beeminder = function(v){var a = arguments; var cb = a[a.length-1]; var arg = a.length > 2? a[1] : undefined
 	var base = 'https://www.beeminder.com/api/v1/'
-	var auth = {auth_token:rc.beeminder.auth[0]}
+	var auth = {auth_token:rc.beeminder.auth}
 	var t0 = cb; cb = function(e,v){if (!e && (v.error || (v.errors && v.errors.length > 0))) t0(v.error||v.errors,v); else t0(e,v)}
 	var t1 = cb; cb = function(e,v){t1(e, e? v : v.json)}
 	var ug = v.match(/^(.+)\/(.+)$/)
@@ -126,22 +138,6 @@ var beeminder = function(v){var a = arguments; var cb = a[a.length-1]; var arg =
 	else if (ugdu && !arg) request('DELETE',base+'users/'+ugdu[1]+'/goals/'+ugdu[2]+'/datapoints/'+ugdu[3]+'.json',auth,{},cb)
 	else request('GET',base+'users/'+ug[1]+'/goals/'+ug[2]+'.json',auth,{},cb)
 	}
-
-//===---------------------------===// util //===---------------------------===//
-
-var f0 = function(f){return function(v){return f(v)}}
-var i = f0(parseInt)
-var err = function(v){print.apply(null,['#err#'].concat(arguments)); throw Error(v)}
-var pluralize = function(n,noun){return n+' '+noun+(n==1?'':'s')}
-Array.prototype.sort_n = function(){return this.sort(function(a,b){return a-b})}
-var divider = function(v){ // 'foo' → '-----foo-----' of length 79
-	var left = Math.floor((79 - v.length)/2), right = 79 - left - v.length
-	return '-'.repeat(left)+v+'-'.repeat(right)}
-var read_line_stdin = function(){return (function(cb){process.stdin.on('readable', function(){var t; if ((t=process.stdin.read())!==null) cb(undefined,t+'')})}).sync()}
-var a_err = function(e,v){if (e) print('ASYNC ERROR:',e)}
-var path_resolve = function(fl){var r = path.resolve(fl); var h = process.env.HOME; return r.slice(0,h.length)===h? '~'+r.slice(h.length) : r}
-var sleep = function(time){(function(cb){setTimeout(cb,time*1000)}).sync()}
-var log_io = function(f){return function(){var a = Array.prototype.slice.apply(arguments); var r = f.apply(this,a); print.apply(undefined,[['IO:',f.name],a,['→',r]].m_concat()); return r}}
 
 //===-------------===// ping file parser and stringifier //===-------------===//
 
@@ -255,7 +251,7 @@ var ping_function = (function(){
 	return {
 		// time → nearest ping time ≤ time
 		le: function(time){while (get() > time) reset_before(time); while (get() <= time) next(); prev(); if (get()!==pings_old.le(time)) err('oh dear ≤.',time,pings_old.le(time),get()); /*print('≤',seqs);*/ return get()},
-		gt: function(time) {var r = ping_function.le(time); while ((r=ping_function.next(r)) <= last) {}; return r}
+		gt: function(time) {var r = ping_function.le(time); while ((r=ping_function.next(r)) <= time) {}; return r},
 		//??
 		next: function(time){next(); if (get()!==pings_old.next(time)) err('oh dear >.',time,pings_old.next(time),get()); /*print('>',seqs);*/ return get()},
 		prev: function(){prev(); return get()},
@@ -269,7 +265,7 @@ var run_pings = function(){var t
 
 	var first
 	var count = 0
-	while (true) {
+	;(function λ(){
 		var time = ping_function.gt(((t=ping_file.last(rc.p))&&t.time) || now()); time = ping_function.prev()
 		first = first || time
 		while(true) {
@@ -284,9 +280,10 @@ var run_pings = function(){var t
 				var tags = prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags})
 				ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
 				tt_sync()
-				}
 			}
-		sleep(1) } }
+		}
+		setTimeout(λ,100)
+		})() }
 
 var prompt // defined in main
 
@@ -369,21 +366,21 @@ var sync_bee = function(){
 				].m_concat(),
 			} }
 
-	var action_sets = async.parallel.sync(null,Object.keys(rc.beeminder).filter(function(v){return v.indexOf('/')!==-1)}).map(function(user_slug){return function(cb){
+	async.parallel(Object.keys(rc.beeminder).filter(function(v){return v.indexOf('/')!==-1}).map(function(user_slug){return function(cb){
 		beeminder(user_slug+'.datapoints',function(e,v){if (e) cb(e,v); else {
 			cb(0,{user_slug:user_slug,
 				actions: generate_actions(
 					user_slug,
 					logfile_pings().filter(function(v){return tagdsl_eval(rc.beeminder[user_slug],v.tags)}),
 					beeminder_pings(v))
-				}) }}) }}))
-
-	action_sets.map(function(v){
-		print(divider(' updating bmndr/'+v.user_slug+' '))
-		v.actions.msgs.map(function(v){print(v.slice(0,80))})
-	})
-
-	if (!args.dry_run) async.parallel.sync(null,action_sets.map(function(v){return v.actions.cmds}).m_concat().map(function(v){return function(cb){beeminder.apply(null,v.concat([cb]))}}))
+				}) }}) }}),
+		function(action_sets){
+			action_sets.map(function(v){
+				print(divider(' updating bmndr/'+v.user_slug+' '))
+				v.actions.msgs.map(function(v){print(v.slice(0,80))})
+			})
+			if (!args.dry_run) async.parallel(action_sets.map(function(v){return v.actions.cmds}).m_concat().map(function(v){return function(cb){beeminder.apply(null,v.concat([cb]))}}))
+		})
 	}
 
 var merge = function(fl){
@@ -400,7 +397,3 @@ module.exports.main = function(args){
 		case 'e'      : print(eval(argv.slice(1).join(' '))); break
 		default       : print('usage: tagtime.js (sync | merge <file>)? (--settings <file>)? (--dry-run)?'); break
 	} }
-
-//===---------------------------===// <end> //===--------------------------===//
-
-}))

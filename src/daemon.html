@@ -4,9 +4,9 @@
 var gui = require('nw.gui')
 var nw_window = gui.Window
 var win = nw_window.get()
-var tagtime_core = require('tagtime_core')
+var tagtime = require('./tagtime.js')
 
-tagtime_core.main({argv:gui.app.Argv, prompt:function(args,cb){
+tagtime.main({argv:gui.App.argv, prompt:function(args,cb){
 	global.ping_args = args
 	var ping_win = nw_window.open('ping.html',{frame:false, 'always-on-top':true, min_width:50, min_height:20, show:false})
 	ping_win.ping_cb = cb

@@ -15,7 +15,10 @@ If you're not using OSX, try [TagTime v0](https://github.com/alice0meta/TagTime/
 
 How to make the tagtime daemon automatically start on bootup in OSX:
 
-sudo ln -s /path/to/tagtimed.pl /Library/StartupItems/tagtimed.pl -->
+sudo ln -s /path/to/tagtimed.pl /Library/StartupItems/tagtimed.pl
+
+TAGTIME_EDITOR or EDITOR environment variables will change the editor
+-->
 
 ## The Math
 
