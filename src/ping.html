@@ -24,14 +24,13 @@
 	var win = gui.Window.get()
 	var jquery = require('jquery'); var $ = function(v){return jquery(v,document)}
 	var exec = require('child_process').exec
-	var argv = gui.App.argv
 
 	var W = document.write.bind(document)
 	var print = function(){process.stdout.write(Array.prototype.slice.call(arguments).join(' ')+'\n')}
 	$.prototype.focus_end = function(){var t = document.createRange(); t.selectNodeContents(this[0]); t.collapse(false); var u = window.getSelection(); u.removeAllRanges(); u.addRange(t)}
 
-	var time = parseInt(argv[0])
-	var last_doing = argv[1] && (argv[1]==='-b'&&argv[2]? argv[2].unb64() : argv[1])
+	var time = global.ping_args.time
+	var last_doing = global.ping_args.last_doing
 	var late = time + 10 <= m()/1000
 </script><body><div id='body'>
 	<script>if (late) W('<div class="warning_outer"><div class="warning">!! this popup is '+Math.round(m()/1000-time)+' seconds late !!</div></div>')</script>
