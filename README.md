@@ -2,12 +2,13 @@ To determine how you spend your time, TagTime literally randomly samples you. At
 
 See [messymatters.com/tagtime](http://messymatters.com/tagtime) for the whole story.
 
+If you're not using OSX, try [TagTime v0](https://github.com/alice0meta/TagTime/tree/master/TagTime%20v0%20perl) for now.
+
 ## Installation and Quick Start
 
-1. If you're not using osx, try [TagTime v0](https://github.com/alice0meta/TagTime/tree/master/TagTime%20v0%20perl) for now.
-1. Pick a directory to put the TagTime installation in, and run `git clone https://github.com/alice0meta/TagTime.git; cd TagTime; ./run.sh`.
+1. Run `cd ~; git clone https://github.com/alice0meta/TagTime.git; TagTime/run.sh` in a terminal.
 1. If this is the first time you've run TagTime, open `~/.tagtime.js` and fill in the settings.
-1. And then run `./run.sh` in that directory again whenever you reboot your machine.
+1. And run `~/TagTime/run.sh` in a terminal again each time after you reboot your machine.
 1. Answer the pings! (Always answer with what it caught you at right at that moment)
 
 <!-- ## Advanced Usage
@@ -27,8 +28,8 @@ The probability of waiting over 10 hours for a ping is one in a million.
 
 ## Beeminder Integration
 
-To set up TagTime to automatically send reports to [Beeminder](http://www.beeminder.com/), first set up a goal there. Copy the `username/slug` and plug it into your `~/tagtime.js` file.
-Each goal on Beeminder will track a collection of one or more tags on TagTime. See `~/tagtime.js` for more details.
+To set up TagTime to automatically send reports to [Beeminder](http://www.beeminder.com/), first set up a goal there. Copy the `username/slug` and plug it into your `~/.tagtime.js` file.
+Each goal on Beeminder will track a collection of one or more tags on TagTime. See `~/.tagtime.js` for more details.
 
 ## Android App
 
@@ -41,13 +42,16 @@ For discussion and questions: [TagTime Google Group](https://groups.google.com/f
 
 ## Code
 
-* `tagtime.js` - desktop daemon, beeminder synchonization, pingfile merging
+<!-- * `tagtime.js` - desktop daemon, beeminder synchonization, pingfile merging
 * `ping-nw/` - node-webkit gui
 * `run.sh` - installs dependencies the first time, runs `tagtime.js` as a daemon with own arguments
 * `stop.sh` - stops existing instances of the daemon
-* `settings.js` - template for user-specific settings
+* `settings.js` - template for user-specific settings -->
 
-* `TagTime v0 perl/` - Original TagTime <!-- by ... who? -->
+* `TagTime v0 perl/` - Original TagTime
+
+<!-- by ... who? -->
+
 * `TagTime v0 python/` - initial work on a new back-end for TagTime contributed by Jonathan Chang and Arthur Breitman
 * `TagTime v0 android/` - the TagTime Android app by Bethany Soule (bsoule) with contributions by Michael Janssen (jamuraa).
 

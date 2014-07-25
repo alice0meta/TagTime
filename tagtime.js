@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 
-var exec = require('child_process').exec
-
 var sync = require('sync')
 var async = require('async')
 var m = require('moment')
@@ -61,7 +59,7 @@ var _ = require('underscore')
 	global.ζ0_memb_Emod_obj = function(o,m,f){o[m] = f(o[m]); return o}
 	Array.prototype.ζ0_concat = function(){return Array.prototype.concat.apply([],this)}
 	global.ζ0_int = function(v){return parseInt(v)}
-//===----===// other copypasted (gitminder, α, stopwatch, ping-nw) //===---===//
+//===--------===// other copypasted (gitminder, α, stopwatch) //===--------===//
 	var merge_o = function(a,b){var r = {}; Object.keys(a).forEach(function(k){r[k] = a[k]}); Object.keys(b).forEach(function(k){r[k] = b[k]}); return r}
 	var seq = function(v){return typeof v === 'string'? v.split('') : v instanceof Array? v : Object.keys(v).map(function(k){return [k,v[k]]})}
 	var frequencies = function(v){return v.reduce(function(r,v){r[v] = v in r? r[v]+1 : 1; return r},{})}
@@ -74,8 +72,6 @@ var _ = require('underscore')
 		var d = Math.floor(v/60/60/24), h = Math.floor(v/60/60)%24, m = Math.floor(v/60)%60, s = v%60
 		return [d+'d',pad(h+'','0',2)+'h',pad(m+'','0',2)+'m',pad(s+'','0',2)+'s'].slice(d>0?0:h>0?1:m>0?2:3).join('')}
 	Array.prototype.m_concat = function(){return Array.prototype.concat.apply([],this)}
-	String.prototype.b64 = function(){return typeof(Buffer)==='undefined'? window.btoa(unescape(encodeURIComponent(this+''))) : new Buffer(this+'').toString('base64')}
-	String.prototype.unb64 = function(){return typeof(Buffer)==='undefined'? decodeURIComponent(escape(window.atob(this+''))) : new Buffer(this+'','base64').toString('utf-8')}
 
 var err_print = function(f){return function(){try{f()} catch (e) {console.log('ERROR:',e,e.stack)}}}
 sync(err_print(function(){
@@ -114,7 +110,7 @@ var request = function(method,path,query,headers,cb){
 			cb(err,{json:json,string:t,response:resp}) }) }).end() }
 var beeminder = function(v){var a = arguments; var cb = a[a.length-1]; var arg = a.length > 2? a[1] : undefined
 	var base = 'https://www.beeminder.com/api/v1/'
-	var auth = {auth_token:rc.auth.beeminder}
+	var auth = {auth_token:rc.beeminder.auth[0]}
 	var t0 = cb; cb = function(e,v){if (!e && (v.error || (v.errors && v.errors.length > 0))) t0(v.error||v.errors,v); else t0(e,v)}
 	var t1 = cb; cb = function(e,v){t1(e, e? v : v.json)}
 	var ug = v.match(/^(.+)\/(.+)$/)
@@ -278,17 +274,15 @@ var run_pings = function(){var t
 
 			print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',pad(format_dur(time-last),' ',9),'avg',format_dur((time-first)/count),'tot',format_dur(time-first))
 
-			if (time < now()-rc.retro_threshold)
+			if (time < now() - 60) {
 				ping_file.append(rc.p,{time:time, period:rc.period, tags:'afk RETRO'})
-			else
-				{prompt(time); tt_sync()}
+			} else {
+				var tags = prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags})
+				ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
+				tt_sync()
+				}
 			}
 		sleep(1) } }
-
-var prompt = function(time){var t
-	var tags = exec.sync(null,rc.gui+'/run.sh '+Math.round(time)+((t=ping_file.last(rc.p))&&(t=t.tags)!==''? ' -b '+t.b64() : '')).trim()
-	ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
-	}
 
 var tt_sync = function(){
 	print(divider(' synchonizing beeminder graphs with local logfile '))
@@ -316,14 +310,14 @@ var sync_bee = function(){
 			else {print('oh no, bad tag dsl!',f); throw 'BAD_TAG_DSL'}
 			} }
 
-	var generate_actions = function(user_slug,f_pings,b_pings){
+	var generate_actions = function(user_slug,f_pings,b_pings){var t
 		f_pings = _.sortBy(f_pings,'time') //! maybe don't need to sort these two?
 		b_pings = _.sortBy(b_pings,'time')
 		f_pings.map(function(v){v.group_time = Math.round(v.time/86400 - 2/3)*86400 + 86400*2/3})
 		b_pings.map(function(v){v.group_time = Math.round(v.time/86400 - 2/3)*86400 + 86400*2/3})
 		if (b_pings.some(function(v){return v.group_time!==v.time})) {print('ERROR: so confused'); throw '‽'}
 
-		var do_group = typeof(rc.grouping)==='string'? _.contains(rc.grouping.split(' '),user_slug) : rc.grouping
+		var do_group = typeof(t=rc.beeminder.grouping)==='string'? _.contains(t.split(' '),user_slug) : t
 		if (!do_group) {print('ERROR: oh sorry, non-grouped upload isn\'t implemented yet'); throw 'IMPL_IS_LAME'}
 
 		//! horrifyingly inefficient
@@ -369,7 +363,7 @@ var sync_bee = function(){
 				].m_concat(),
 			} }
 
-	var action_sets = async.parallel.sync(null,Object.keys(rc.beeminder).map(function(user_slug){return function(cb){
+	var action_sets = async.parallel.sync(null,Object.keys(rc.beeminder).filter(function(v){return v.indexOf('/')!==-1)}).map(function(user_slug){return function(cb){
 		beeminder(user_slug+'.datapoints',function(e,v){if (e) cb(e,v); else {
 			cb(0,{user_slug:user_slug,
 				actions: generate_actions(

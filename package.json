@@ -1,14 +1,7 @@
 {
   "name": "tagtime",
   "main": "index.html",
-  "window": {
-    "frame": false,
-    "always-on-top": true,
-    "min_width": 20,
-    "min_height": 20,
-    "show": false,
-    "show_in_taskbar": false
-  },
+  "window": {"show":false, "show_in_taskbar":false},
   "dependencies": {
     "async": "^0.9.0",
     "jquery": "^2.1.1",
