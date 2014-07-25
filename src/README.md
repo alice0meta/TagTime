@@ -1,1 +1,0 @@
-see https://github.com/alice0meta/TagTime/blob/master/README.md for the real readme

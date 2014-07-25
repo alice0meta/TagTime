@@ -25,7 +25,7 @@ var exec = require('child_process').exec
 // pings_if(): skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level (current afk behavior is undesirable in many ways)
 	// okay, so just as is, but if you miss any pings it pops up the editor immediately?
 // maybe add the off autotag too
-// add an autoupdater
+// add autoupdating
 // fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
 // implement editor environment variable: editor: '', //! todo: implement // "CHANGEME if you don't like vi (eg: /usr/bin/pico)"
 // handle Cancel as different from Enter
