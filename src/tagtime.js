@@ -392,8 +392,8 @@ module.exports.main = function(args){
 	var argv = args.argv
 	switch (argv[0]) {
 		case undefined: run_pings(); break
-		case 'ping'   : prompt({time:i(argv[1]), last_doing:argv[2]},function(tags){print(tags)}); break
-		case 'sync'   : tt_sync(); break
+		case 'ping'   : prompt({time:i(argv[1]), last_doing:argv[2]},function(tags){print(tags); process.exit()}); break
+		case 'sync'   : tt_sync(); process.exit(); break
 		case 'merge'  : merge(argv[1]); break
 		case 'e'      : print(eval(argv.slice(1).join(' '))); break
 		default       : print('usage: tagtime.js (sync | merge <file>)? (--settings <file>)? (--dry-run)?'); break

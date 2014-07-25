@@ -29,5 +29,6 @@ fi
 # git pull -q
 #//! check if it's updated and rebuild appropriate things
 
-kill $(pgrep -f tagtime) 2>/dev/null
-bin/node-webkit.app/Contents/MacOS/node-webkit bin/tagtime.nw "$@"
+t=$(pgrep -f tagtime); if [ "$t" ]; then echo "killing existing tagtime process $t"; kill "$t" 2>/dev/null; fi
+
+(bin/node-webkit.app/Contents/MacOS/node-webkit bin/tagtime.nw "$@" &)
