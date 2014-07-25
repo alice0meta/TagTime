@@ -29,6 +29,7 @@ var exec = require('child_process').exec
 // fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
 // implement editor environment variable: editor: '', //! todo: implement // "CHANGEME if you don't like vi (eg: /usr/bin/pico)"
 // handle Cancel as different from Enter
+// just send the pings to a logfile
 
 //===----------------------------===// ζ₀ //===----------------------------===//
 	global.fs = require('fs')
@@ -268,7 +269,7 @@ var run_pings = function(){var t
 	;(function λ(){
 		var time = ping_function.gt(((t=ping_file.last(rc.p))&&t.time) || now()); time = ping_function.prev()
 		first = first || time
-		while(true) {
+		;(function λ(){
 			var last = time; time = ping_function.next(time)
 			if (!(time <= now())) break
 
@@ -276,12 +277,15 @@ var run_pings = function(){var t
 
 			if (time < now() - 60) {
 				ping_file.append(rc.p,{time:time, period:rc.period, tags:'afk RETRO'})
+				setTimeout(λ,0)
 			} else {
-				var tags = prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags})
-				ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
-				tt_sync()
+				prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags},function(tags){				
+					ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
+					tt_sync()
+					setTimeout(λ,0)
+				})
 			}
-		}
+			})
 		setTimeout(λ,100)
 		})() }
 
