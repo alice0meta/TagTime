@@ -271,7 +271,7 @@ var run_pings = function(){var t
 		first = first || time
 		;(function λ(){
 			var last = time; time = ping_function.next(time)
-			if (!(time <= now())) break
+			if (!(time <= now())) return
 
 			print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',pad(format_dur(time-last),' ',9),'avg',format_dur((time-first)/count),'tot',format_dur(time-first))
 
