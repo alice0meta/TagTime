@@ -4,7 +4,7 @@ PATH="/usr/local/bin:$PATH:.:./node_modules/.bin"
 
 mk() { cat >"$1"; chmod -R 755 "$1" &>/dev/null; }
 
-stop() { t=$(pgrep -f tagtime); if [ "$t" ]; then echo "killing existing tagtime process $t"; kill "$t"; fi; }
+stop() { t=$(pgrep -f 'webkit.*tagtime'); if [ "$t" ]; then echo "killing existing tagtime process $t"; kill "$t"; fi; }
 
 gen_tt_nw() { zip -FSrq bin/tagtime.nw daemon.html loud-ding.wav node_modules package.json ping.html settings.js tagtime.js; }
 
