@@ -51,7 +51,7 @@
 		$('#tags').on('click',function(e){e.stopPropagation()})
 		$(document).on('click',function(e){$('#tags').focus_end()})
 
-		var output_and_close = function(v){v=v||$('#tags').text(); win.close(); win.ping_cb(v==='"'? last_doing : v)}
+		var output_and_close = function(v){v=v||$('#tags').text(); win.close(); win.ping_cb(null,(v==='"'? last_doing : v).trim().split(/\s+/).join(' '))}
 		$('#tags').keypress(function(e){if (e.which == 13) output_and_close()})
 		$('#ditto').on('click',function(){output_and_close('"')})
 

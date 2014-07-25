@@ -10,13 +10,16 @@ If you're not using OSX, try [TagTime v0](https://github.com/alice0meta/TagTime/
 1. Answer the pings! (Always answer with what it caught you at right at that moment)
 1. Run `~/TagTime/run.sh` in a terminal again each time after you reboot your machine, or to check for updates.
 
-<!-- ## Advanced Usage
+<!--
+## Semi-Secret Features
 
 How to make the tagtime daemon automatically start on bootup in OSX:
 
 sudo ln -s /path/to/tagtimed.pl /Library/StartupItems/tagtimed.pl
 
-TAGTIME_EDITOR or EDITOR environment variables will change the editor
+The `editor` key will change the editor tagtime uses to open files - for instance, `"editor": "vim +"` for vim.
+
+The `macros` key can be a dictionary of {search:replacement} to modify your tags - for instance, if `"macros": {"foo": "spam eggs"}` and you enter "foo foobar" it will be transformed into "spam eggs foobar".
 -->
 
 ## The Math

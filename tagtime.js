@@ -13,9 +13,10 @@ var exec = require('child_process').exec
 // "Tiny improvement to TagTime for Android: pings sent to Beeminder include the time in the datapoint comment"
 // okay. so we can't find a closed form. so our ping algorithm is probably ridiculously overcomplicated, geez. decomplicate it!
 	// maybe refactor ping algorithm *again* to avoid maintaining state
-// make sure parens are implemented correctly
 // consider reenabling seed: 666, // for pings not in sync with other peoples' pings, change this
-// improve the autoupdater: make it more robust, more convenient, and check for updates more frequently than just every time it runs
+// improve the autoupdater: make it more robust, more convenient, and check for updates more frequently than just every time it runs. and check for local updates.
+// "an installer for node-webkit" https://github.com/shama/nodewebkit
+// maybe prepare the gui beforehand so that we can make it come up on exactly the right instant?
 
 // todo:
 // ‽ make this into a webapp hosted on github?
@@ -25,10 +26,12 @@ var exec = require('child_process').exec
 // bah, fuck, i ate the timezone information again. fix?
 // pings_if(): skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level (current afk behavior is undesirable in many ways)
 	// okay, so just as is, but if you miss any pings it pops up the editor immediately?
+	// oh, current behavior seems like "ignores any missed pings and logs them"
 // maybe add the off autotag too
 // fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
-// implement editor environment variable: editor: '', //! todo: implement // "CHANGEME if you don't like vi (eg: /usr/bin/pico)"
 // handle Cancel as different from Enter
+// yeah, okay, the config file should probably just be json
+// make sure parens are implemented correctly
 
 //===----------------------------===// ζ₀ //===----------------------------===//!
 	global.fs = require('fs')
@@ -84,7 +87,10 @@ var pluralize = function(n,noun){return n+' '+noun+(n==1?'':'s')}
 var divider = function(v){ // 'foo' → '-----foo-----' of length 79
 	var left = Math.floor((79 - v.length)/2), right = 79 - left - v.length
 	return '-'.repeat(left)+v+'-'.repeat(right)}
-var editor = function(){return process.env.TAGTIME_EDITOR || process.env.EDITOR || 'open -a TextEdit'}
+// var escape_regex = function(v){return v.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1')}
+// String.prototype.replace_all = function(find,replace){return this.replace(new RegExp(escape_regex(find),'g'),replace)}
+
+var editor = function(){return rc.editor || 'open -a TextEdit'}
 
 //===-------------------===// get args and settings //===------------------===//
 
@@ -107,6 +113,8 @@ rc.seed = 666; //Math.round(Math.random()*2200) + 800
 
 rc.p = rc.ping_file
 if (!fs(rc.p).exists()) fs(rc.p).$ = ''
+
+if (typeof(rc.macros)==='string') rc.macros = JSON.parse(fs(rc.macros).$)
 
 //===----------===// less hacky hacky partial beeminder api //===----------===//
 
@@ -278,7 +286,7 @@ var run_pings = function(){var t
 			ping_file.append(rc.p,{time:time, period:rc.period, tags:'afk RETRO'})
 			setTimeout(λ,0,time)
 		} else {
-			prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags},function(tags){
+			prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags},function(e,tags){
 				ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
 				tt_sync()
 				setTimeout(λ,0,time)
@@ -286,7 +294,8 @@ var run_pings = function(){var t
 		}
 		})() }
 
-var prompt // defined in main
+var prompt_fn // defined in main
+var prompt = function(v,cb){prompt_fn(v,function(e,tags){if (rc.macros) tags = tags.split(' ').map(function(v){return rc.macros[v]||v}).join(' '); cb(e,tags)})}
 
 var tt_sync = function(){
 	print(divider(' synchonizing beeminder graphs with local logfile '))
@@ -389,11 +398,11 @@ var merge = function(fl){
 	if (!args.dry_run) ping_file.write(rc.p,_.sortBy(ping_file.all(rc.p).concat(ping_file.all(fl)),'time')) }
 
 module.exports.main = function(args){
-	prompt = args.prompt
+	prompt_fn = args.prompt
 	var argv = args.argv
 	switch (argv[0]) {
 		case undefined: run_pings(); break
-		case 'ping'   : prompt({time:i(argv[1]), last_doing:argv[2]},function(tags){print(tags); process.exit()}); break
+		case 'prompt' : prompt({time:i(argv[1]), last_doing:argv[2]},function(e,tags){print(tags); process.exit()}); break
 		case 'sync'   : tt_sync(); process.exit(); break
 		case 'merge'  : merge(argv[1]); break
 		case 'e'      : print(eval(argv.slice(1).join(' '))); break
