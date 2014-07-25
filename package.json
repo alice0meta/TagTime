@@ -1,6 +1,6 @@
 {
   "name": "tagtime",
-  "main": "index.html",
+  "main": "daemon.html",
   "window": {"show":false, "show_in_taskbar":false},
   "dependencies": {
     "async": "^0.9.0",

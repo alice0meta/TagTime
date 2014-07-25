@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 var sync = require('sync')
 var async = require('async')
 var m = require('moment')
@@ -290,6 +288,8 @@ var run_pings = function(){var t
 			}
 		sleep(1) } }
 
+var prompt // defined in main
+
 var tt_sync = function(){
 	print(divider(' synchonizing beeminder graphs with local logfile '))
 	sync_bee()
@@ -390,17 +390,16 @@ var merge = function(fl){
 	print('merging',fs(fs(fl).realpath()).path,'into',fs(fs(rc.p).realpath()).path)
 	if (!args.dry_run) ping_file.write(rc.p,_.sortBy(ping_file.all(rc.p).concat(ping_file.all(fl)),'time')) }
 
-//===----------------===// call function based on args //===---------------===//
-
-if (module.parent) print("oh my goodness, so sorry, but, tagtime.js isn't built to be require()'d!")
-
-switch (args._[0]) {
-case undefined: run_pings(); break
-case 'sync'   : tt_sync(); break
-case 'merge'  : merge(args._[1]); break
-case 'e'      : print(eval(args._.slice(1).join(' '))); break
-default       : print('usage: tagtime.js (sync | merge <file>)? (--settings <file>)? (--dry-run)?'); break
-}
+module.exports.main = function(args){
+	prompt = args.prompt
+	var argv = args.argv
+	switch (argv[0]) {
+		case undefined: run_pings(); break
+		case 'sync'   : tt_sync(); break
+		case 'merge'  : merge(argv[1]); break
+		case 'e'      : print(eval(argv.slice(1).join(' '))); break
+		default       : print('usage: tagtime.js (sync | merge <file>)? (--settings <file>)? (--dry-run)?'); break
+	} }
 
 //===---------------------------===// <end> //===--------------------------===//
 
