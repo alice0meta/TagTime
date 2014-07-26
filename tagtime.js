@@ -10,8 +10,8 @@ var exec = require('child_process').exec
 // todo back:
 // have read_graph cache its results
 // ‽ implement "In the future this should show a cool pie chart that lets you click on the appropriate pie slice, making that slice grow slightly. And the slice boundaries could be fuzzy to indicate the confidence intervals! Ooh, and you can drag the slices around to change the order so similar things are next to each other and it remembers that order for next time! That's gonna rock."
+//     so, when i took five minutes to consider "what would be a *good* interface for tagging?", i thought of "what about a field of 2-dimensional tag-blobs, with size proportional to frequency, that can be persistently dragged around?"
 // make the ping algorithm not slow to start up
-// //! comments
 // ?? maybe allow multidirectional sync with beeminder graphs ??
 // "Tiny improvement to TagTime for Android: pings sent to Beeminder include the time in the datapoint comment"
 // consider reenabling seed: 666, // for pings not in sync with other peoples' pings, change this
@@ -20,18 +20,21 @@ var exec = require('child_process').exec
 // maybe prepare the gui beforehand so that we can make it come up on exactly the right instant?
 
 // todo:
+// //! comments
 // pings_if(): after logging old datapoints, open the log file in an editor
 // ??sortedness of log files??
 // notes on danny's tagtime workflow: when entering tags, <enter> with no characters will just go straight to the editor. xterm mechanics is just that tagtime calls xterm with appropriate arguments and then is a running program in xterm. and then can optionally call editors and stuff.
 // bah, fuck, i ate the timezone information again. fix?
 // pings_if(): skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level (current afk behavior is undesirable in many ways)
-// okay, so just as is, but if you miss any pings it pops up the editor immediately?
-// oh, current behavior seems like "ignores any missed pings and logs them"
-// maybe add the off autotag too
+//     okay, so just as is, but if you miss any pings it pops up the editor immediately?
+//     oh, current behavior seems like "ignores any missed pings and logs them"
 // fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
-// handle Cancel as different from Enter
+// maybe do add the off autotag too
+// handle Cancel as different from Enter: quietly log the ping as missed_ping, possibly also with the entered text, but also maybe not
 // make sure parens are implemented correctly
 // btw, the tagtime daemon's output should be logged somewhere.
+// danny's rc.beeminder dsl is observed to only contain tag, (& tags), (| tags), and (! tag)
+// it's actually finally clear how to separate this into different files
 
 // okay. so we can't find a closed form. so our ping algorithm is probably ridiculously overcomplicated, geez. decomplicate it!
 	// maybe refactor ping algorithm *again* to avoid maintaining state
@@ -109,7 +112,7 @@ if (!fs(args.settings).exists()) {
 	print("hey, I've put a settings file at",args.settings,"for you. Go fill it in!")
 	edit(args.settings) }
 
-try {var rc = JSON.parse((fs(args.settings).$+'').replace(/\/\/.*/g,'').replace(/,\s*([}\]])/g,'$1'))}
+try {var rc = JSON.parse((fs(args.settings).$+'').replace(/\/\/.*/g,''))}
 catch (e) {print('ERROR: bad rc file:',e); process.exit(1)}
 
 if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will very occasionally skip pings! (period:',rc.period+')'); process.exit(1)} //!

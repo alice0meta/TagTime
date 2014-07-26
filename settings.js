@@ -6,7 +6,7 @@
 	"beeminder": {
 		// get your auth token from https://www.beeminder.com/api/v1/auth_token.json
 		"auth": "xxxxxxxxxxxxxxxxxxxx",
-		"grouping": true, // group pings by day
+		"grouping": true // group pings by day
 		// "grouping": false, // have a datapoint for each ping
 		// "grouping": "bob/play bob/work", // group pings for these but not any others
 
@@ -23,5 +23,5 @@
 		// "carol/nafk": "¬ afk",
 		// send "job" pings that are not "akrasia" to bmndr.com/dave/real-work:
 		// "dave/real-work": "job & ! akrasia",
-	},
+	}
 }
