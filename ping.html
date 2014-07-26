@@ -79,7 +79,7 @@
 		win.moveTo(Math.round((window.screen.width-x)/2),Math.round((window.screen.height-y)/2))
 		win.setResizable(false)
 
-		new Audio('loud-ding.wav').play()
+		new Audio(global.ping_args.ping_sound).play()
 		setTimeout(function(){win.show(); win.focus()},200)
 		setTimeout(function(){exec('say "one does not simply tag their time"')
 			setTimeout(function(){exec('say "what if i tagged my time?"')}

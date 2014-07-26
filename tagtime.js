@@ -90,17 +90,17 @@ var divider = function(v){ // 'foo' → '-----foo-----' of length 79
 // var escape_regex = function(v){return v.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1')}
 // String.prototype.replace_all = function(find,replace){return this.replace(new RegExp(escape_regex(find),'g'),replace)}
 
-var editor = function(){return rc.editor || 'open -a TextEdit'}
-
 //===-------------------===// get args and settings //===------------------===//
 
 //! actually respect --dry everywhere!
 var args = minimist(argv._,{alias:{dry_run:['d','dry','dry-run'],settings:'s'}, default:{settings:'~/.tagtime.js'}})
 
+rc.editor = rc.editor || 'open -a TextEdit'
+
 if (!fs(args.settings).exists()) {
 	fs(args.settings).$ = (fs('settings.js').$+'').replace(/‹([^›]+)›/g,function(_,v){var t; return is(t=eval(v))?t:''})
 	print("hey, I've put a settings file at",args.settings,"for you. Go fill it in!")
-	exec(editor()+" '"+fs(args.settings).realpath()+"'")
+	exec(rc.editor+" '"+fs(args.settings).realpath()+"'")
 }
 
 try{var rc = eval('({'+fs(args.settings).$+'\n})')}
@@ -295,7 +295,9 @@ var run_pings = function(){var t
 		})() }
 
 var prompt_fn // defined in main
-var prompt = function(v,cb){prompt_fn(v,function(e,tags){if (rc.macros) tags = tags.split(' ').map(function(v){return rc.macros[v]||v}).join(' '); cb(e,tags)})}
+var prompt = function(v,cb){
+	v.ping_sound = rc.ping_sound || 'loud-ding.wav'
+	prompt_fn(v,function(e,tags){if (rc.macros) tags = tags.split(' ').map(function(v){return rc.macros[v]||v}).join(' '); cb(e,tags)})}
 
 var tt_sync = function(){
 	print(divider(' synchonizing beeminder graphs with local logfile '))

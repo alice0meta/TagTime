@@ -13,6 +13,10 @@ If you're not using OSX, try [TagTime v0](https://github.com/alice0meta/TagTime/
 <!--
 ## Semi-Secret Features
 
+These features may spontaneously vanish! If you're depending on any of them, lemme know and I'll put you on the "depends on weird things" list, and I'll ask the list before removing it.
+
+current "depends on weird things" list: danny
+
 How to make the tagtime daemon automatically start on bootup in OSX:
 
 sudo ln -s /path/to/tagtimed.pl /Library/StartupItems/tagtimed.pl
@@ -20,6 +24,8 @@ sudo ln -s /path/to/tagtimed.pl /Library/StartupItems/tagtimed.pl
 The `editor` key will change the editor tagtime uses to open files - for instance, `"editor": "vim +"` for vim.
 
 The `macros` key can be a dictionary of {search:replacement} to modify your tags - for instance, if `"macros": {"foo": "spam eggs"}` and you enter "foo foobar" it will be transformed into "spam eggs foobar".
+
+The `ping_sound` key can be a sound file to ping, instead of the default.
 -->
 
 ## The Math
