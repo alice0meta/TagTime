@@ -92,19 +92,23 @@ var divider = function(v){ // 'foo' → '-----foo-----' of length 79
 
 //===-------------------===// get args and settings //===------------------===//
 
+//! so we should refactor this to make command-line args and rc file more synonymous and stuff.
+
 //! actually respect --dry everywhere!
 var args = minimist(argv._,{alias:{dry_run:['d','dry','dry-run'],settings:'s'}, default:{settings:'~/.tagtime.js'}})
 
-rc.editor = rc.editor || 'open -a TextEdit'
+var rc_editor = rc_editor || 'open -a TextEdit'
 
 if (!fs(args.settings).exists()) {
 	fs(args.settings).$ = (fs('settings.js').$+'').replace(/‹([^›]+)›/g,function(_,v){var t; return is(t=eval(v))?t:''})
 	print("hey, I've put a settings file at",args.settings,"for you. Go fill it in!")
-	exec(rc.editor+" '"+fs(args.settings).realpath()+"'")
+	exec(rc_editor+" '"+fs(args.settings).realpath()+"'")
 }
 
 try{var rc = eval('({'+fs(args.settings).$+'\n})')}
 catch(e){print('ERROR: bad rc file:',e); process.exit(1)}
+
+rc.editor = rc_editor
 
 if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:',rc.period+')'); process.exit(1)} //!
 
