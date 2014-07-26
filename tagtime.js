@@ -4,6 +4,9 @@ var minimist = require('minimist')
 var _ = require('underscore')
 var exec = require('child_process').exec
 
+// roadmapy:
+// we want to deploy to windows, osx, linux, webapp, android, and ios
+
 // todo back:
 // have read_graph cache its results
 // ‽ implement "In the future this should show a cool pie chart that lets you click on the appropriate pie slice, making that slice grow slightly. And the slice boundaries could be fuzzy to indicate the confidence intervals! Ooh, and you can drag the slices around to change the order so similar things are next to each other and it remembers that order for next time! That's gonna rock."
@@ -11,27 +14,27 @@ var exec = require('child_process').exec
 // //! comments
 // ?? maybe allow multidirectional sync with beeminder graphs ??
 // "Tiny improvement to TagTime for Android: pings sent to Beeminder include the time in the datapoint comment"
-// okay. so we can't find a closed form. so our ping algorithm is probably ridiculously overcomplicated, geez. decomplicate it!
-	// maybe refactor ping algorithm *again* to avoid maintaining state
 // consider reenabling seed: 666, // for pings not in sync with other peoples' pings, change this
 // improve the autoupdater: make it more robust, more convenient, and check for updates more frequently than just every time it runs. and check for local updates.
 // "an installer for node-webkit" https://github.com/shama/nodewebkit
 // maybe prepare the gui beforehand so that we can make it come up on exactly the right instant?
 
 // todo:
-// ‽ make this into a webapp hosted on github?
 // pings_if(): after logging old datapoints, open the log file in an editor
 // ??sortedness of log files??
 // notes on danny's tagtime workflow: when entering tags, <enter> with no characters will just go straight to the editor. xterm mechanics is just that tagtime calls xterm with appropriate arguments and then is a running program in xterm. and then can optionally call editors and stuff.
 // bah, fuck, i ate the timezone information again. fix?
 // pings_if(): skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level (current afk behavior is undesirable in many ways)
-	// okay, so just as is, but if you miss any pings it pops up the editor immediately?
-	// oh, current behavior seems like "ignores any missed pings and logs them"
+// okay, so just as is, but if you miss any pings it pops up the editor immediately?
+// oh, current behavior seems like "ignores any missed pings and logs them"
 // maybe add the off autotag too
 // fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
 // handle Cancel as different from Enter
-// yeah, okay, the config file should probably just be json
 // make sure parens are implemented correctly
+// btw, the tagtime daemon's output should be logged somewhere.
+
+// okay. so we can't find a closed form. so our ping algorithm is probably ridiculously overcomplicated, geez. decomplicate it!
+	// maybe refactor ping algorithm *again* to avoid maintaining state
 
 //===----------------------------===// ζ₀ //===----------------------------===//!
 	global.fs = require('fs')
@@ -99,16 +102,15 @@ var edit = function(fl){exec(((rc&&rc.editor)||'open -a TextEdit')+" '"+fs(fl).r
 //! so we should refactor this to make command-line args and rc file more synonymous and stuff.
 
 //! actually respect --dry everywhere!
-var args = minimist(argv._,{alias:{dry_run:['d','dry','dry-run'],settings:'s'}, default:{settings:'~/.tagtime.js'}})
+var args = minimist(argv._,{alias:{dry_run:['d','dry','dry-run'],settings:'s'}, default:{settings:'~/.tagtime.json'}})
 
 if (!fs(args.settings).exists()) {
 	fs(args.settings).$ = (fs('settings.js').$+'').replace(/‹([^›]+)›/g,function(_,v){var t; return is(t=eval(v))?t:''})
 	print("hey, I've put a settings file at",args.settings,"for you. Go fill it in!")
-	edit(args.settings)
-}
+	edit(args.settings) }
 
-try{var rc = eval('({'+fs(args.settings).$+'\n})')}
-catch(e){print('ERROR: bad rc file:',e); process.exit(1)}
+try {var rc = JSON.parse((fs(args.settings).$+'').replace(/\/\/.*/g,'').replace(/,\s*([}\]])/g,'$1'))}
+catch (e) {print('ERROR: bad rc file:',e); process.exit(1)}
 
 if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will very occasionally skip pings! (period:',rc.period+')'); process.exit(1)} //!
 
@@ -300,7 +302,8 @@ var run_pings = function(){var t
 var prompt_fn // defined in main
 var prompt = function(v,cb){
 	v.ping_sound = rc.ping_sound || 'loud-ding.wav'
-	prompt_fn(v,function(e,tags){if (rc.macros) {var m = typeof(rc.macros)==='string'? JSON.parse(fs(rc.macros).$) : rc.macros; tags = tags.split(' ').map(function(v){return m[v]||v}).join(' ');} cb(e,tags)})}
+	prompt_fn(v,function(e,tags){
+		if (rc.macros) {var m = typeof(rc.macros)==='string'? JSON.parse(fs(rc.macros).$) : rc.macros; tags = tags.split(' ').map(function(v){return m[v]||v}).join(' ');} cb(e,tags)})}
 
 var tt_sync = function(){
 	print(divider(' synchonizing beeminder graphs with local logfile '))

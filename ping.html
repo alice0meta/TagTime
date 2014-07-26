@@ -34,7 +34,7 @@
 	var last_doing = global.ping_args.last_doing
 	var late = time + 10 <= m()/1000
 </script><body><div id='body'>
-	<script>if (late) W('<div class="warning_outer"><div class="warning">!! this popup is '+Math.round(m()/1000-time)+' seconds late !!</div></div>')</script>
+	<script>if (late) W('<div class="warning_outer"><div class="warning">!! this ping is '+Math.round(m()/1000-time)+' seconds late !!</div></div>')</script>
 	<p>It's tag time! What are you doing RIGHT NOW (<script>W(m(time*1000).format('HH:mm:ss'))</script>)?</p>
 	<script>if (last_doing) W('<p>Ditto <button id=ditto class="inline">(<span class="tagstr">"</span>)</button> to repeat prev tags: <span class="tagstr">'+last_doing+'</span></p>')</script>
 	<div style="margin:5px"><div id=tags class="expando_input tagstr" contenteditable="true"></div></div>
@@ -47,17 +47,17 @@
 		r.append(new gui.MenuItem(t))
 	}); return r}
 
+	var output_and_close = function(v){v=v||$('#tags').text(); win.hide(); win.close(); win.ping_cb(null,(v==='"'? last_doing : v).trim().split(/\s+/).join(' '))}
+
 	$(document).ready(function(){
 		$('#tags').focus()
-		$('#tags').on('click',function(e){e.stopPropagation()})
 		$(document).on('click',function(e){$('#tags').focus_end()})
+		$('#tags').on('click',function(e){e.stopPropagation()})
 
-		var output_and_close = function(v){v=v||$('#tags').text(); win.hide(); win.close(); win.ping_cb(null,(v==='"'? last_doing : v).trim().split(/\s+/).join(' '))}
-		$('#tags').keypress(function(e){if (e.which == 13) output_and_close()})
+		$('#tags').keypress(function(e){if (e.which===13) output_and_close()}) // enter key
 		$('#ditto').on('click',function(){output_and_close('"')})
 
-		// win.reloadIgnoringCache()
-		// win.hide()
+		$(document).mouseenter(function(){win.show(); win.focus()})
 
 		win.menu = menu({type:'menubar'},[
 			['',0,menu(0,[

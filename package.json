@@ -1,7 +1,7 @@
 {
   "name": "tagtime",
   "description": "desktop tagtime",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "repository": {
     "type": "git",
     "url": "https://github.com/alice0meta/TagTime.git"
@@ -15,7 +15,7 @@
     "moment": "^2.7.0",
     "underscore": "^1.6.0"
   },
-  "main": "daemon.html",
+  "main": "main.html",
   "window": {
     "show": false,
     "show_in_taskbar": false
