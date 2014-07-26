@@ -280,7 +280,7 @@ var run_pings = function(){var t
 		if (!time) {time = ping_function.gt(((t=ping_file.last(rc.p))&&t.time) || now()); time = ping_function.prev()}
 		first = first || time
 		var last = time; time = ping_function.next(time)
-		if (!(time <= now())) {setTimeout(λ,100); return}
+		if (!(time <= now())) {setTimeout(λ,500); return}
 
 		print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',pad(format_dur(time-last),' ',9),'avg',format_dur((time-first)/count),'tot',format_dur(time-first))
 

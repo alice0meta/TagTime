@@ -27,7 +27,8 @@
 
 	var W = document.write.bind(document)
 	var print = function(){process.stdout.write(Array.prototype.slice.call(arguments).join(' ')+'\n')}
-	$.prototype.focus_end = function(){var t = document.createRange(); t.selectNodeContents(this[0]); t.collapse(false); var u = window.getSelection(); u.removeAllRanges(); u.addRange(t)}
+	var c_log = function(){console.log.apply(console,arguments); window.__ = arguments[arguments.length-1]}
+	jquery.prototype.focus_end = function(){var t = document.createRange(); t.selectNodeContents(this[0]); t.collapse(false); var u = window.getSelection(); u.removeAllRanges(); u.addRange(t)}
 
 	var time = global.ping_args.time
 	var last_doing = global.ping_args.last_doing
@@ -51,7 +52,7 @@
 		$('#tags').on('click',function(e){e.stopPropagation()})
 		$(document).on('click',function(e){$('#tags').focus_end()})
 
-		var output_and_close = function(v){v=v||$('#tags').text(); win.close(); win.ping_cb(null,(v==='"'? last_doing : v).trim().split(/\s+/).join(' '))}
+		var output_and_close = function(v){v=v||$('#tags').text(); win.hide(); win.close(); win.ping_cb(null,(v==='"'? last_doing : v).trim().split(/\s+/).join(' '))}
 		$('#tags').keypress(function(e){if (e.which == 13) output_and_close()})
 		$('#ditto').on('click',function(){output_and_close('"')})
 
@@ -81,8 +82,5 @@
 
 		new Audio(global.ping_args.ping_sound).play()
 		setTimeout(function(){win.show(); win.focus()},200)
-		setTimeout(function(){exec('say "one does not simply tag their time"')
-			setTimeout(function(){exec('say "what if i tagged my time?"')}
-		,40*1000)},20*1000)
 	})
 </script>
