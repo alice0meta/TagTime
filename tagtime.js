@@ -117,7 +117,7 @@ rc.seed = 666; //Math.round(Math.random()*2200) + 800
 
 rc.p = rc.ping_file
 if (!fs(rc.p).exists()) fs(rc.p).$ = ''
- vcxz
+
 //===----------===// less hacky hacky partial beeminder api //===----------===//
 
 var http = require('http')
