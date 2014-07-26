@@ -90,6 +90,10 @@ var divider = function(v){ // 'foo' → '-----foo-----' of length 79
 // var escape_regex = function(v){return v.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1')}
 // String.prototype.replace_all = function(find,replace){return this.replace(new RegExp(escape_regex(find),'g'),replace)}
 
+//===---------------------===// tt-specific util //===---------------------===//
+
+var edit = function(fl){exec(((rc&&rc.editor)||'open -a TextEdit')+" '"+fs(fl).realpath()+"'")}
+
 //===-------------------===// get args and settings //===------------------===//
 
 //! so we should refactor this to make command-line args and rc file more synonymous and stuff.
@@ -97,20 +101,16 @@ var divider = function(v){ // 'foo' → '-----foo-----' of length 79
 //! actually respect --dry everywhere!
 var args = minimist(argv._,{alias:{dry_run:['d','dry','dry-run'],settings:'s'}, default:{settings:'~/.tagtime.js'}})
 
-var rc_editor = rc_editor || 'open -a TextEdit'
-
 if (!fs(args.settings).exists()) {
 	fs(args.settings).$ = (fs('settings.js').$+'').replace(/‹([^›]+)›/g,function(_,v){var t; return is(t=eval(v))?t:''})
 	print("hey, I've put a settings file at",args.settings,"for you. Go fill it in!")
-	exec(rc_editor+" '"+fs(args.settings).realpath()+"'")
+	edit(args.settings)
 }
 
 try{var rc = eval('({'+fs(args.settings).$+'\n})')}
 catch(e){print('ERROR: bad rc file:',e); process.exit(1)}
 
-rc.editor = rc_editor
-
-if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will occasionally skip pings! (period:',rc.period+')'); process.exit(1)} //!
+if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will very occasionally skip pings! (period:',rc.period+')'); process.exit(1)} //!
 
 rc.seed = 666; //Math.round(Math.random()*2200) + 800
 // if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) {print('ERROR: seeds probably should be positive, not too close to each other, and not too big (seed:',rc.seed+'). How about',(1000 + Math.round(Math.random()*2000))+'?'); process.exit(1)}
@@ -292,6 +292,7 @@ var run_pings = function(){var t
 		} else {
 			prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags},function(e,tags){
 				ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
+				if (tags==='') edit(rc.p)
 				tt_sync()
 				setTimeout(λ,0,time)
 			})
