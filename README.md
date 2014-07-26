@@ -35,7 +35,7 @@ For discussion and questions: [TagTime Google Group](https://groups.google.com/f
 
 ## Semi-Secret Features
 
-These features may spontaneously vanish! If you're depending on any of them, lemme know and I'll put you on the "depends on weird things" list, and I'll ask the list before removing it.
+These features may spontaneously vanish! If you're depending on any of them, lemme know and I'll put you on the "depends on weird things" list, and I'll ask the list before removing them.
 <!-- 
 current "depends on weird things" list: danny
 
@@ -45,7 +45,7 @@ sudo ln -s /path/to/tagtimed.pl /Library/StartupItems/tagtimed.pl
  -->
 The `editor` key will change the editor tagtime uses to open files - for instance, `"editor": "vim +"` for vim.
 
-The `macros` key can be a dictionary of {search:replacement} to modify your tags - for instance, if `"macros": {"foo": "spam eggs"}` and you enter "foo foobar" it will be transformed into "spam eggs foobar".
+The `macros` key can be a dictionary of `{search:replacement}` to modify your tags - for instance, if `"macros": {"foo": "spam eggs"}` and you enter `foo foobar` it will be transformed into `spam eggs foobar`. It can also be the name of a file!
 
 The `ping_sound` key can be a sound file to ping, instead of the default.
 

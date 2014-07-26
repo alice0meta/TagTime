@@ -117,9 +117,7 @@ rc.seed = 666; //Math.round(Math.random()*2200) + 800
 
 rc.p = rc.ping_file
 if (!fs(rc.p).exists()) fs(rc.p).$ = ''
-
-if (typeof(rc.macros)==='string') rc.macros = JSON.parse(fs(rc.macros).$)
-
+ vcxz
 //===----------===// less hacky hacky partial beeminder api //===----------===//
 
 var http = require('http')
@@ -302,7 +300,7 @@ var run_pings = function(){var t
 var prompt_fn // defined in main
 var prompt = function(v,cb){
 	v.ping_sound = rc.ping_sound || 'loud-ding.wav'
-	prompt_fn(v,function(e,tags){if (rc.macros) tags = tags.split(' ').map(function(v){return rc.macros[v]||v}).join(' '); cb(e,tags)})}
+	prompt_fn(v,function(e,tags){if (rc.macros) {var m = typeof(rc.macros)==='string'? JSON.parse(fs(rc.macros).$) : rc.macros; tags = tags.split(' ').map(function(v){return m[v]||v}).join(' ');} cb(e,tags)})}
 
 var tt_sync = function(){
 	print(divider(' synchonizing beeminder graphs with local logfile '))
