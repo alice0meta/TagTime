@@ -6,12 +6,14 @@ var nw_window = gui.Window
 var win = nw_window.get()
 var tagtime = require('./tagtime.js')
 
+// win.close()
+
 tagtime.main({argv:gui.App.argv, prompt:function(args,cb){
 	global.ping_args = args
 	var ping_win = nw_window.open('ping.html',{frame:false, 'always-on-top':true, min_width:50, min_height:20, show:false})
 	ping_win.ping_cb = cb
 	win.setShowInTaskbar(true)
-	ping_win.on('close',function(){win.setShowInTaskbar(false); this.close(true)})
+	ping_win.on('close',function(){win.setShowInTaskbar(false); this.hide(); this.close(true)})
 	}})
 
 </script>

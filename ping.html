@@ -39,7 +39,7 @@
 	<script>if (last_doing) W('<p>Ditto <button id=ditto class="inline">(<span class="tagstr">"</span>)</button> to repeat prev tags: <span class="tagstr">'+last_doing+'</span></p>')</script>
 	<div style="margin:5px"><div id=tags class="expando_input tagstr" contenteditable="true"></div></div>
 </div></body></html><script>
-	var L = function(a,b){a = 'IDS_'+a+'_MAC'; return b? nwDispatcher.getNSStringFWithFixup(a,b) :nwDispatcher.getNSStringWithFixup(a)}
+	var L = function(a,b){a = 'IDS_'+a+'_MAC'; return b? nwDispatcher.getNSStringFWithFixup(a,b) : nwDispatcher.getNSStringWithFixup(a)}
 	var menu = function(args,v){var r = args? new gui.Menu(args) : new gui.Menu(); v.forEach(function(v){
 		var t = {label:v[0]}
 		if (v[1]) {t.modifiers = v[1].split('').slice(0,-1).map(function(v){return v.replace(/⌘/g,'cmd').replace(/⇧/g,'shift').replace(/⌥/g,'alt').replace(/\^/g,'ctrl')}).join('-'); t.key = v[1].slice(-1)[0]}
@@ -47,7 +47,7 @@
 		r.append(new gui.MenuItem(t))
 	}); return r}
 
-	var output_and_close = function(v){v=v||$('#tags').text(); win.hide(); win.close(); win.ping_cb(null,(v==='"'? last_doing : v).trim().split(/\s+/).join(' '))}
+	var output_and_close = function(v){v=v||$('#tags').text(); win.close(); win.ping_cb(null,(v==='"'? last_doing : v).trim().split(/\s+/).join(' '))}
 
 	$(document).ready(function(){
 		$('#tags').focus()
