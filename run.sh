@@ -6,7 +6,7 @@ mk() { cat >"$1"; chmod -R 755 "$1" &>/dev/null; }
 
 stop() { t=$(pgrep -f 'webkit.*tagtime'); if [ "$t" ]; then echo "killing existing tagtime process $t"; kill "$t"; fi; }
 
-gen_tt_nw() { zip -FSrq bin/tagtime.nw main.html loud-ding.wav node_modules package.json ping.html settings.js tagtime.js; }
+gen_tt_nw() { zip -FSrq bin/tagtime.nw $(for v in *; do if [ -f "$v" ]; then echo $v; fi; done) node_modules; }
 
 main() {
 	if [ -f "./node_modules/.bin/cmp-version" ]; then

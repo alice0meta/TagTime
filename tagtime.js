@@ -18,6 +18,8 @@ var exec = require('child_process').exec
 // improve the autoupdater: make it more robust, more convenient, and check for updates more frequently than just every time it runs. and check for local updates.
 // "an installer for node-webkit" https://github.com/shama/nodewebkit
 // maybe prepare the gui beforehand so that we can make it come up on exactly the right instant?
+// maybe separate the processes *again* to get rid of that blur bug
+// tray menu! https://gist.github.com/halida/9634676
 
 // todo:
 // //! comments
@@ -30,14 +32,9 @@ var exec = require('child_process').exec
 //     oh, current behavior seems like "ignores any missed pings and logs them"
 // fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
 // maybe do add the off autotag too
-// handle Cancel as different from Enter: quietly log the ping as missed_ping, possibly also with the entered text, but also maybe not
-// make sure parens are implemented correctly
 // btw, the tagtime daemon's output should be logged somewhere.
 // danny's rc.beeminder dsl is observed to only contain tag, (& tags), (| tags), and (! tag)
 // it's actually finally clear how to separate this into different files
-
-// okay. so we can't find a closed form. so our ping algorithm is probably ridiculously overcomplicated, geez. decomplicate it!
-	// maybe refactor ping algorithm *again* to avoid maintaining state
 
 //===----------------------------===// ζ₀ //===----------------------------===//!
 	global.fs = require('fs')
@@ -156,21 +153,21 @@ var beeminder = function(v){var a = arguments; var cb = a[a.length-1]; var arg =
 
 //===-------------===// ping file parser and stringifier //===-------------===//
 
-var ping_file = (function(){
-	// log format is: 2014-03-26/19:51:56-07:00‹p22.5›? a b c (a:blah)
-	var format = 'YYYY-MM-DD/HH:mm:ssZ'
+var ping_file = function(fl){
+	// log format is: 2014-03-26/19:51:56-07:00‹p22.5›? a b c (a: comment)
+	var dt_fmt = 'YYYY-MM-DD/HH:mm:ssZ'
 	var parse = function(v){
-		if (v.match(/^....-/)) {var t = v.match(/^([^\sp]+)(p\S+)? (.*)$/); return {time:m.utc(t[1],format)/1000, period:t[2]? parseFloat(t[2]):45, tags:t[3].trim()}}
+		if (v.match(/^....-/)) {var t = v.match(/^([^\sp]+)(p\S+)? (.*)$/); return {time:m.utc(t[1],dt_fmt)/1000, period:t[2]? parseFloat(t[2]) : 45, tags:t[3].trim()}}
 		else {var t = v.match(/^(\d+)([^\[]+)/); if (!t) err('bad log file'); return {time:i(t[1]), period:rc.period, tags:t[2].trim()}}
 		}
-	var stringify = function(v){return m(v.time*1000).format(format)+(v.period===45?'':'p'+v.period)+' '+v.tags}
+	var stringify = function(v){return m(v.time*1000).format(dt_fmt)+(v.period===45?'':'p'+v.period)+' '+v.tags}
 	var read_nonblank_lines = function(fl){return fs(fl).$.split('\n').filter(function(v){return v!==''})}
 	return {
-		last: function(fl){var t; return (t=read_nonblank_lines(fl).slice(-1)[0])? parse(t) : undefined},
-		append: function(fl,v){fs(fl).append(stringify(v)+'\n')},
-		write: function(fl,v){fs(fl).$ = v.map(stringify).join('\n')+'\n'},
-		all: function(fl){return read_nonblank_lines(fl).map(parse)},
-	} })()
+		last: function(){var t; return (t=read_nonblank_lines(fl).slice(-1)[0])? parse(t) : undefined},
+		append: function(v){fs(fl).append(stringify(v)+'\n')},
+		write: function(v){fs(fl).$ = v.map(stringify).join('\n')+'\n'},
+		all: function(){return read_nonblank_lines(fl).map(parse)},
+	} }
 
 //===----------------------===// ping algorithm //===----------------------===//
 
@@ -221,6 +218,9 @@ var pings_old = (function(){
 		// time → nearest ping time > time
 		next: function(time){while (get() >  time) prev(); while (get() <= time) next(); return get()},
 	} })()
+
+//! okay. so we can't find a closed form. so our ping algorithm is probably ridiculously overcomplicated, geez. decomplicate it!
+// maybe refactor ping algorithm *again* to avoid maintaining state
 
 var ping_function = (function(){
 	// utils
@@ -282,7 +282,7 @@ var run_pings = function(){var t
 	var count = 0
 	;(function λ(time){
 		//! bah, this local structure is ridiculous. refactor it!
-		if (!time) {time = ping_function.gt(((t=ping_file.last(rc.p))&&t.time) || now()); time = ping_function.prev()}
+		if (!time) {time = ping_function.gt(((t=ping_file(rc.p).last())&&t.time) || now()); time = ping_function.prev()}
 		first = first || time
 		var last = time; time = ping_function.next(time)
 		if (!(time <= now())) {setTimeout(λ,500); return}
@@ -290,12 +290,13 @@ var run_pings = function(){var t
 		print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',pad(format_dur(time-last),' ',9),'avg',format_dur((time-first)/count),'tot',format_dur(time-first))
 
 		if (time < now() - 60) {
-			ping_file.append(rc.p,{time:time, period:rc.period, tags:'afk RETRO'})
+			ping_file(rc.p).append({time:time, period:rc.period, tags:'afk RETRO'})
 			setTimeout(λ,0,time)
 		} else {
-			prompt({time:time,last_doing:(t=ping_file.last(rc.p))&&t.tags},function(e,tags){
-				ping_file.append(rc.p,{time:time, period:rc.period, tags:tags})
-				if (tags==='') edit(rc.p)
+			prompt({time:time,last_doing:(t=ping_file(rc.p).last())&&t.tags},function(e,args){
+				ping_file(rc.p).append({time:time, period:rc.period, tags:args.tags})
+				if (args.tags==='') edit(rc.p)
+				// if (args.canceled) //! do something?
 				tt_sync()
 				setTimeout(λ,0,time)
 			})
@@ -305,8 +306,8 @@ var run_pings = function(){var t
 var prompt_fn // defined in main
 var prompt = function(v,cb){
 	v.ping_sound = rc.ping_sound || 'loud-ding.wav'
-	prompt_fn(v,function(e,tags){
-		if (rc.macros) {var m = typeof(rc.macros)==='string'? JSON.parse(fs(rc.macros).$) : rc.macros; tags = tags.split(' ').map(function(v){return m[v]||v}).join(' ');} cb(e,tags)})}
+	prompt_fn(v,function(e,args){
+		if (rc.macros) {var m = typeof(rc.macros)==='string'? JSON.parse(fs(rc.macros).$) : rc.macros; args.tags = args.tags.split(' ').map(function(v){return m[v]||v}).join(' ');} cb(e,args)})}
 
 var tt_sync = function(){
 	print(divider(' synchonizing beeminder graphs with local logfile '))
@@ -314,7 +315,7 @@ var tt_sync = function(){
 	}
 var sync_bee = function(){
 	// the log file → [{time: period: tags:}]
-	var logfile_pings = function(){return ping_file.all(rc.p)}
+	var logfile_pings = function(){return ping_file(rc.p).all()}
 	// beeminder api datapoints → [{time: period: tags: id: group:}]
 	var beeminder_pings = function(datapoints){
 		return _.flatten(datapoints.filter(function(v){return v.value!==0}).filter(function(v){return v.comment!=='fake'}).map(function(v){
@@ -325,7 +326,7 @@ var sync_bee = function(){
 
 	var tagdsl_eval = function(f,tags){
 		f = f.split(' ')
-		var check = function(v){return tags.split(/ +/).some(function(t){return t===v})}
+		var check = function(v){return tags.replace(/\(.*?\)/g,' ').trim().split(/ +/).some(function(t){return t===v})}
 		var first_next = function(f){return f[0]==='¬'||f[0]==='!'? [!check(f[1]),f.slice(2)] : [check(f[0]), f.slice(1)]}
 		var v = first_next(f); while (true) {
 			if (v[1].length===0) return v[0]
@@ -406,14 +407,14 @@ var sync_bee = function(){
 
 var merge = function(fl){
 	print('merging',fs(fs(fl).realpath()).path,'into',fs(fs(rc.p).realpath()).path)
-	if (!args.dry_run) ping_file.write(rc.p,_.sortBy(ping_file.all(rc.p).concat(ping_file.all(fl)),'time')) }
+	if (!args.dry_run) ping_file(rc.p).write(_.sortBy(ping_file(rc.p).all().concat(ping_file(fl).all()),'time')) }
 
 module.exports.main = function(args){
 	prompt_fn = args.prompt
 	var argv = args.argv
 	switch (argv[0]) {
 		case undefined: run_pings(); break
-		case 'prompt' : prompt({time:i(argv[1]), last_doing:argv[2]},function(e,tags){print(tags);}); break
+		case 'prompt' : prompt({time:i(argv[1]), last_doing:argv[2]},function(e,args){print(args)}); break
 		case 'sync'   : tt_sync(); process.exit(); break
 		case 'merge'  : merge(argv[1]); break
 		case 'e'      : print(eval(argv.slice(1).join(' '))); break

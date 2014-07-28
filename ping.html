@@ -47,15 +47,20 @@
 		r.append(new gui.MenuItem(t))
 	}); return r}
 
-	var output_and_close = function(v){v=v||$('#tags').text(); win.close(); win.ping_cb(null,(v==='"'? last_doing : v).trim().split(/\s+/).join(' '))}
+	var return_and_close = function(tags,canceled){
+		tags = canceled? 'missing_ping' :
+			((tags=tags||$('#tags').text())==='"'? last_doing : tags).trim().split(/\s+/).join(' ')
+		win.close(true)
+		global.ping_args.cb(null,{tags:tags,canceled:canceled})}
+	win.on('close',function(){return_and_close(null,true)})
 
 	$(document).ready(function(){
 		$('#tags').focus()
 		$(document).on('click',function(e){$('#tags').focus_end()})
 		$('#tags').on('click',function(e){e.stopPropagation()})
 
-		$('#tags').keypress(function(e){if (e.which===13) output_and_close()}) // enter key
-		$('#ditto').on('click',function(){output_and_close('"')})
+		$('#tags').keypress(function(e){if (e.which===13) return_and_close()}) // enter key
+		$('#ditto').on('click',function(){return_and_close('"')})
 
 		$(document).mouseenter(function(){win.show(); win.focus()})
 
