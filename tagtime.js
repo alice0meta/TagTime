@@ -92,6 +92,7 @@ var divider = function(v){ // 'foo' → '-----foo-----' of length 79
 	return '-'.repeat(left)+v+'-'.repeat(right)}
 // var escape_regex = function(v){return v.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1')}
 // String.prototype.replace_all = function(find,replace){return this.replace(new RegExp(escape_regex(find),'g'),replace)}
+var bit_reverse_i = function(length,v){var r = 0; for (var i=0;i<length;i++){r = (r << 1) | (v & 1); v = v >> 1}; return r}
 
 //===---------------------===// tt-specific util //===---------------------===//
 
@@ -169,107 +170,40 @@ var ping_file = function(fl){
 		all: function(){return read_nonblank_lines(fl).map(parse)},
 	} }
 
-//===----------------------===// ping algorithm //===----------------------===//
-
-var pings_old = (function(){
-	// utils
-	var bit_reverse = function(length,v){var r = 0; for (var i=0;i<length;i++){r = (r << 1) | (v & 1); v = v >> 1}; return r}
-	var pow_mod = function(v,e,m){ // vᵉ % m
-		var i32_mul_mod = function(a,b,m) { // a*b % m
-			// probably breaks if 2³²%m > 2²⁰ or so
-			var ah = (a >> 16) & 0xffff, al = a & 0xffff
-			var bh = (b >> 16) & 0xffff, bl = b & 0xffff
-			return (al*bl + ((ah*bl + al*bh) * Math.pow(2,16)) + ah*bh * (Math.pow(2,32) % m)) % m}
-		var r = 1; while (e > 0) {if (e % 2 === 1) r = i32_mul_mod(r,v,m); v = i32_mul_mod(v,v,m); e = e >> 1}; return r}
-	var range = function(l){var r = []; for (var i=0;i<l;i++) r.push(i); return r}
-	Array.prototype.min_by = function(f){
-		if (this.length <= 1) return this[0]
-		var r = this[0]; var fr = f(r)
-		this.slice(1).map(function(v){var t; if ((t=f(v)) < fr) {r = v; fr = t}})
-		return r}
-	Array.prototype.max_by = function(f){
-		if (this.length <= 1) return this[0]
-		var r = this[0]; var fr = f(r)
-		this.slice(1).map(function(v){var t; if ((t=f(v)) > fr) {r = v; fr = t}})
-		return r}
-	
-	// see p37 of Simulation by Ross
-	//var ran0 = function(seed){return Math.pow(7,5)*seed % (Math.pow(2,31)-1)} // ran0 from Numerical Recipes
-	var ran0_closed = function(seed,i){return seed*pow_mod(Math.pow(7,5),i+1,(Math.pow(2,31)-1)) % (Math.pow(2,31)-1)}
-	var interval = function(seed,i){return Math.max(1,Math.round(-45*60*Math.log(ran0_closed(seed,i) / (Math.pow(2,31)-1))))}
-
-	var seq_count = 45 / rc.period
-	var seq_fraction = seq_count+1 - Math.ceil(seq_count)
-	var seqs
-
-	var again = seq_fraction===1? function(v){return false} : function(v){return v===seqs.slice(-1)[0] && !(bit_reverse(31,ran0_closed(v.seed,v.i)) / (Math.pow(2,31)-1) <= seq_fraction)}
-	var next_s = function λ(v){var t = again(v); v.ping += interval(v.seed,v.i); v.i+=1; return t? λ(v) : v}
-	var prev_s = function λ(v){v.i-=1; v.ping -= interval(v.seed,v.i); return again(v)? λ(v) : v}
-	var get = function(){return seqs.min_by(function(v){return v.ping}).ping}
-	var next = function(){next_s(seqs.min_by(function(v){return v.ping}))}
-	var prev = function(){prev_s(seqs.max_by(function(v){return v.ping - interval(v.seed,v.i-1)}))}
-
-	if (Math.ceil(seq_count)===1 && rc.seed===666) {seqs = [{seed:rc.seed, i:78922, ping:1397086515}]; prev()} // optimization: a recent seqs
-	else {seqs = range(Math.ceil(seq_count)).map(function(v){return {seed:rc.seed+v, i:0, ping:1184083200}}); seqs = seqs.map(next_s)} // the birth of timepie/tagtime!
-
-	return {
-		// time → nearest ping time ≤ time
-		le:   function(time){while (get() <= time) next(); while (get() >  time) prev(); return get()},
-		// time → nearest ping time > time
-		next: function(time){while (get() >  time) prev(); while (get() <= time) next(); return get()},
-	} })()
-
-//! okay. so we can't find a closed form. so our ping algorithm is probably ridiculously overcomplicated, geez. decomplicate it!
-// maybe refactor ping algorithm *again* to avoid maintaining state
+//===-----------------------===// ping function //===----------------------===//
 
 var ping_function = (function(){
-	// utils
-	var bit_reverse = function(length,v){var r = 0; for (var i=0;i<length;i++){r = (r << 1) | (v & 1); v = v >> 1}; return r}
-	var range = function(l){var r = []; for (var i=0;i<l;i++) r.push(i); return r}
-	var min_by = function(v,f){
-		var r = [v[0],0]
-		if (v.length <= 1) return r
-		var fr = f(r[0])
-		v.slice(1).map(function(v,i){var t; if ((t=f(v)) < fr) {r = [v,i]; fr = t}})
-		return r}
-	var max_by = function(v,f){
-		var r = [v[0],0]
-		if (v.length <= 1) return r
-		var fr = f(r[0])
-		v.slice(1).map(function(v,i){var t; if ((t=f(v)) > fr) {r = [v,i]; fr = t}})
-		return r}
-	
-	// see p37 of Simulation by Ross
-	var ran0 = function(seed){return Math.pow(7,5)*seed % (Math.pow(2,31)-1)} // ran0 from Numerical Recipes
-	var ping_next = function(ping){var t = ran0(ping.seed); return {seed:t, time:ping.time+Math.max(1,Math.round(-45*60*Math.log(t / (Math.pow(2,31)-1))))}}
+	var ping_next = function(ping){
+		// see p37 of Simulation by Ross
+		ping.seed = Math.pow(7,5)*ping.seed % (Math.pow(2,31)-1) // ran0 from Numerical Recipes
+		ping.time += Math.round(Math.max(1,-45*60*Math.log(ping.seed / (Math.pow(2,31)-1))))
+		}
+	var keep = function(v){return !v.fraction || bit_reverse_i(31,v.seed) / (Math.pow(2,31)-1) <= v.fraction}
+	var next_s = function(v){do {ping_next(v)} while (!keep(v))}
 
-	var seq_count = 45 / rc.period
-	var seq_fraction = seq_count+1 - Math.ceil(seq_count)
+	var t = 45 / rc.period
+	var seq_count = Math.ceil(t)
+	var seq_fraction = 1-(seq_count-t)
+	
 	var seqs
 
-	// if (Math.ceil(seq_count)===1 && rc.seed===666) {seqs = [{seed:?, time:1401267914}]; prev()} // optimization: a recent seqs
-	// else {seqs = range(Math.ceil(seq_count)).map(function(v){return {seed:rc.seed+v, time:1184083200}}); seqs = seqs.map(next_s)} // the birth of timepie/tagtime!
-
-	//! eep. i'm not sure if v.seed or maybe ran0(v.seed) is the right thing to bit_reverse (originally we had ran0_closed(v.seed_0,v.i))
-	var again = seq_fraction===1? function(v,i){return false} : function(v,i){return i===seqs.length-1 && !(bit_reverse(31,v.seed) / (Math.pow(2,31)-1) <= seq_fraction)}
-	var next_s = function λ(v,i){var t = again(v,i); var r = ping_next(v); if (t) r = λ(r,i); r.prev = {seed:v.seed, time:v.time}; return r}
-
 	var reset_before = function(time){
-		seqs = range(Math.ceil(seq_count)).map(function(v){return {seed:rc.seed+v, time:1184083200}}); seqs = seqs.map(next_s)
-	}
-	var get = function(){var r = min_by(seqs,function(v){return v.time})[0].time; return r}
-	var next = function(){var t = min_by(seqs,function(v){return v.time}); seqs[t[1]] = next_s(t[0],t[1])}
-	var prev = function(){var t = max_by(seqs,function(v){return v.prev.time}); seqs[t[1]] = t[0].prev}
-
+		seqs = _.range(seq_count).map(function(v){return {seed:rc.seed+v, time:1184083200}}); seqs.forEach(next_s) // the birth of timepie/tagtime!
+		if (seq_fraction!==1) seqs.slice(-1)[0].fraction = seq_fraction
+		}
+	var get = function(){var r = _.min(seqs,function(v){return v.time}).time; return r}
+	var next = function(){next_s(_.min(seqs,function(v){return v.time}))}
+	
 	reset_before(now())
 
 	return {
 		// time → nearest ping time ≤ time
-		le: function(time){while (get() > time) reset_before(time); while (get() <= time) next(); prev(); if (get()!==pings_old.le(time)) err('oh dear ≤.',time,pings_old.le(time),get()); /*print('≤',seqs);*/ return get()},
-		gt: function(time) {var r = ping_function.le(time); while ((r=ping_function.next(r)) <= time) {}; return r},
+		le: function(time){
+			if (get() > time) reset_before(time)
+			while (true) {var prev_seqs = JSON.parse(JSON.stringify(seqs)); next(); if (get() > time) {seqs = prev_seqs; break}}
+			return get()},
 		//??
-		next: function(time){next(); if (get()!==pings_old.next(time)) err('oh dear >.',time,pings_old.next(time),get()); /*print('>',seqs);*/ return get()},
-		prev: function(){prev(); return get()},
+		next: function(){next(); return get()},
 	} })()
 
 //===--===// fns loosely corresponding to the original architecture //===--===//
@@ -278,16 +212,14 @@ var ping_function = (function(){
 var run_pings = function(){var t
 	var n; var t; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=ping_function.le(n))),'ago, at',m(t*1000).format('HH:mm:ss'))
 
-	var first
 	var count = 0
 	;(function λ(time){
 		//! bah, this local structure is ridiculous. refactor it!
-		if (!time) {time = ping_function.gt(((t=ping_file(rc.p).last())&&t.time) || now()); time = ping_function.prev()}
-		first = first || time
-		var last = time; time = ping_function.next(time)
+		if (!time) time = ping_function.le(((t=ping_file(rc.p).last())&&t.time) || now())
+		var last = time; time = ping_function.next()
 		if (!(time <= now())) {setTimeout(λ,500); return}
 
-		print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',pad(format_dur(time-last),' ',9),'avg',format_dur((time-first)/count),'tot',format_dur(time-first))
+		print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',format_dur(time-last))
 
 		if (time < now() - 60) {
 			ping_file(rc.p).append({time:time, period:rc.period, tags:'afk RETRO'})
@@ -414,7 +346,7 @@ module.exports.main = function(args){
 	var argv = args.argv
 	switch (argv[0]) {
 		case undefined: run_pings(); break
-		case 'prompt' : prompt({time:i(argv[1]), last_doing:argv[2]},function(e,args){print(args)}); break
+		case 'prompt' : prompt({time:i(argv[1]), last_doing:argv[2]},function(e,args){print(args.tags)}); break
 		case 'sync'   : tt_sync(); process.exit(); break
 		case 'merge'  : merge(argv[1]); break
 		case 'e'      : print(eval(argv.slice(1).join(' '))); break
