@@ -4,14 +4,17 @@ var minimist = require('minimist')
 var _ = require('underscore')
 var exec = require('child_process').exec
 
+// sometime eventually:
+// expand reset_before to make ping_function faster to start up
+// instead of ignoring non-parsed beeminder graph pings, maybe zero the datapoints and annotate the comment? like, 28 1 "foo" → 28 0 "foo [was 1; zeroed by tagtime syncing]"
+
 // roadmapy:
 // we want to deploy to windows, osx, linux, webapp, android, and ios
 
 // todo back:
 // have read_graph cache its results
 // ‽ implement "In the future this should show a cool pie chart that lets you click on the appropriate pie slice, making that slice grow slightly. And the slice boundaries could be fuzzy to indicate the confidence intervals! Ooh, and you can drag the slices around to change the order so similar things are next to each other and it remembers that order for next time! That's gonna rock."
-//     so, when i took five minutes to consider "what would be a *good* interface for tagging?", i thought of "what about a field of 2-dimensional tag-blobs, with size proportional to frequency, that can be persistently dragged around?"
-// make the ping algorithm not slow to start up
+//     so, when i took five minutes to consider "what would be a *good* interface for tagging?", i thought of "what about a field of 2-dimensional tag-cells, with size proportional to frequency, that can be persistently dragged around?"
 // ?? maybe allow multidirectional sync with beeminder graphs ??
 // "Tiny improvement to TagTime for Android: pings sent to Beeminder include the time in the datapoint comment"
 // consider reenabling seed: 666, // for pings not in sync with other peoples' pings, change this
@@ -23,11 +26,11 @@ var exec = require('child_process').exec
 
 // todo:
 // //! comments
-// pings_if(): after logging old datapoints, open the log file in an editor
 // ??sortedness of log files??
 // notes on danny's tagtime workflow: when entering tags, <enter> with no characters will just go straight to the editor. xterm mechanics is just that tagtime calls xterm with appropriate arguments and then is a running program in xterm. and then can optionally call editors and stuff.
 // bah, fuck, i ate the timezone information again. fix?
 // pings_if(): skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level (current afk behavior is undesirable in many ways)
+//     pings_if(): after logging old datapoints, open the log file in an editor`
 //     okay, so just as is, but if you miss any pings it pops up the editor immediately?
 //     oh, current behavior seems like "ignores any missed pings and logs them"
 // fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
@@ -36,7 +39,8 @@ var exec = require('child_process').exec
 // danny's rc.beeminder dsl is observed to only contain tag, (& tags), (| tags), and (! tag)
 // it's actually finally clear how to separate this into different files
 
-//===----------------------------===// ζ₀ //===----------------------------===//!
+//! separation into different files:
+//===----------------------------===// ζ₀ //===----------------------------===//
 	global.fs = require('fs')
 	global.path = require('path')
 	global.moment = require('moment')
@@ -45,16 +49,18 @@ var exec = require('child_process').exec
 	String.prototype.repeat = function(v){return new Array(v+1).join(this)}
 	global.pad = function(v,s){return v+s.slice(v.length)}
 	global.argv = {_:process.argv.slice(4)}
-	function Path(path){this._path = path.replace(/^~\//,process.env.HOME+'/')}; var t = function(path){return new Path(path)}; t.__proto__ = fs; global.fs = t
+	Function.prototype.def = function(m,get,set){Object.defineProperty(this.prototype,m,{configurable:true, enumerable:false, get:get, set:set}); return this}
+	_.range(0,5).forEach(function(i){Array.def('-'+i,function(){return this.length<i? undefined : this[this.length-i]},function(v){return this.length<i? v : this[this.length-i] = v})})
+	var Path = function Path(path){this._path = path.replace(/^~\//,process.env.HOME+'/')}
+		.def('$',function(){return new PathValue(this._path)},
+			function(v){
+				mkdirp.sync(path.dirname(this._path))
+				if (v instanceof PathValue) fs.createReadStream(v._path).pipe(fs.createWriteStream(this._path))
+				else fs.writeFileSync(this._path,v,{mode:493})
+				})
+		.def('path',function(){return this._path.slice(0,(process.env.HOME+'/').length)===process.env.HOME+'/'? '~'+this._path.slice(process.env.HOME.length) : this._path})
+	var t = function(path){return new Path(path)}; t.__proto__ = fs; global.fs = t
 	function PathValue(path){this._path = path}
-	Object.defineProperty(Path.prototype,'$',{
-		get:function(){return new PathValue(this._path)},
-		set:function(v){
-			mkdirp.sync(path.dirname(this._path))
-			if (v instanceof PathValue) fs.createReadStream(v._path).pipe(fs.createWriteStream(this._path))
-			else fs.writeFileSync(this._path,v,{mode:493})
-			} })
-	Object.defineProperty(Path.prototype,'path',{get:function(){return this._path.slice(0,(process.env.HOME+'/').length)===process.env.HOME+'/'? '~'+this._path.slice(process.env.HOME.length) : this._path}})
 	Path.prototype.realpath = function(){return fs.realpathSync(this._path)}
 	Path.prototype.exists = function(){return fs.existsSync(this._path)}
 	Path.prototype.append = function(v){fs.appendFileSync(this._path,v)}
@@ -66,7 +72,7 @@ var exec = require('child_process').exec
 	global.ζ0_memb_Emod_obj = function(o,m,f){o[m] = f(o[m]); return o}
 	Array.prototype.ζ0_concat = function(){return Array.prototype.concat.apply([],this)}
 	global.ζ0_int = function(v){return parseInt(v)}
-//===---===// other copypasted (lang-alpha, stopwatch, daemon.html) //===--===//!
+//===---===// other copypasted (lang-alpha, stopwatch, daemon.html) //===--===//
 	var merge_o = function(a,b){var r = {}; Object.keys(a).forEach(function(k){r[k] = a[k]}); Object.keys(b).forEach(function(k){r[k] = b[k]}); return r}
 	var seq = function(v){return typeof v === 'string'? v.split('') : v instanceof Array? v : Object.keys(v).map(function(k){return [k,v[k]]})}
 	var frequencies = function(v){return v.reduce(function(r,v){r[v] = v in r? r[v]+1 : 1; return r},{})}
@@ -102,8 +108,7 @@ var edit = function(fl){exec(((rc&&rc.editor)||'open -a TextEdit')+" '"+fs(fl).r
 
 //! so we should refactor this to make command-line args and rc file more synonymous and stuff.
 
-//! actually respect --dry everywhere!
-var args = minimist(argv._,{alias:{dry_run:['d','dry','dry-run'],settings:'s'}, default:{settings:'~/.tagtime.json'}})
+var args = minimist(argv._,{alias:{dry:'d',settings:'s'}, default:{settings:'~/.tagtime.json'}})
 
 if (!fs(args.settings).exists()) {
 	fs(args.settings).$ = (fs('settings.js').$+'').replace(/‹([^›]+)›/g,function(_,v){var t; return is(t=eval(v))?t:''})
@@ -112,8 +117,6 @@ if (!fs(args.settings).exists()) {
 
 try {var rc = JSON.parse((fs(args.settings).$+'').replace(/\/\/.*/g,''))}
 catch (e) {print('ERROR: bad rc file:',e); process.exit(1)}
-
-if (rc.period < 45) {print('ERROR: periods under 45min are not yet properly implemented! it will very occasionally skip pings! (period:',rc.period+')'); process.exit(1)} //!
 
 rc.seed = 666; //Math.round(Math.random()*2200) + 800
 // if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) {print('ERROR: seeds probably should be positive, not too close to each other, and not too big (seed:',rc.seed+'). How about',(1000 + Math.round(Math.random()*2000))+'?'); process.exit(1)}
@@ -154,7 +157,7 @@ var beeminder = function(v){var a = arguments; var cb = a[a.length-1]; var arg =
 
 //===-------------===// ping file parser and stringifier //===-------------===//
 
-var ping_file = function(fl){
+var ping_file = (function(){
 	// log format is: 2014-03-26/19:51:56-07:00‹p22.5›? a b c (a: comment)
 	var dt_fmt = 'YYYY-MM-DD/HH:mm:ssZ'
 	var parse = function(v){
@@ -163,12 +166,11 @@ var ping_file = function(fl){
 		}
 	var stringify = function(v){return m(v.time*1000).format(dt_fmt)+(v.period===45?'':'p'+v.period)+' '+v.tags}
 	var read_nonblank_lines = function(fl){return fs(fl).$.split('\n').filter(function(v){return v!==''})}
-	return {
-		last: function(){var t; return (t=read_nonblank_lines(fl).slice(-1)[0])? parse(t) : undefined},
-		append: function(v){fs(fl).append(stringify(v)+'\n')},
-		write: function(v){fs(fl).$ = v.map(stringify).join('\n')+'\n'},
-		all: function(){return read_nonblank_lines(fl).map(parse)},
-	} }
+	var r = function(fl){this.fl = fl}
+		.def('$',function(){return read_nonblank_lines(this.fl).map(parse)},
+			function(v){fs(this.fl).$ = v.map(stringify).join('\n')+'\n'; return this})
+	r.prototype.append = function(v){fs(this.fl).append(stringify(v)+'\n'); return this}
+	return function(fl){return new r(fl)}})()
 
 //===-----------------------===// ping function //===----------------------===//
 
@@ -179,17 +181,17 @@ var ping_function = (function(){
 		ping.time += Math.round(Math.max(1,-45*60*Math.log(ping.seed / (Math.pow(2,31)-1))))
 		}
 	var keep = function(v){return !v.fraction || bit_reverse_i(31,v.seed) / (Math.pow(2,31)-1) <= v.fraction}
-	var next_s = function(v){do {ping_next(v)} while (!keep(v))}
+	var next_s = function(v){
+		var existing = _.pluck(seqs,'time')
+		do {ping_next(v)} while (!keep(v))
+		while (_.contains(existing,v.time)) v.time += 1
+		}
 
-	var t = 45 / rc.period
-	var seq_count = Math.ceil(t)
-	var seq_fraction = 1-(seq_count-t)
-	
+	var t = 45 / rc.period; var seq_count = Math.ceil(t); var seq_fraction = 1-(seq_count-t)
 	var seqs
-
 	var reset_before = function(time){
 		seqs = _.range(seq_count).map(function(v){return {seed:rc.seed+v, time:1184083200}}); seqs.forEach(next_s) // the birth of timepie/tagtime!
-		if (seq_fraction!==1) seqs.slice(-1)[0].fraction = seq_fraction
+		if (seq_fraction!==1) seqs[-1].fraction = seq_fraction
 		}
 	var get = function(){var r = _.min(seqs,function(v){return v.time}).time; return r}
 	var next = function(){next_s(_.min(seqs,function(v){return v.time}))}
@@ -202,38 +204,36 @@ var ping_function = (function(){
 			if (get() > time) reset_before(time)
 			while (true) {var prev_seqs = JSON.parse(JSON.stringify(seqs)); next(); if (get() > time) {seqs = prev_seqs; break}}
 			return get()},
-		//??
+		// get the next ping
 		next: function(){next(); return get()},
 	} })()
 
 //===--===// fns loosely corresponding to the original architecture //===--===//
 
-// runs the ping script at appropriate times and sends afk datapoints to the ping file
+// pings at appropriate times and logs pings to the ping file and syncs with beeminder
 var run_pings = function(){var t
-	var n; var t; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=ping_function.le(n))),'ago, at',m(t*1000).format('HH:mm:ss'))
-
-	var count = 0
-	;(function λ(time){
-		//! bah, this local structure is ridiculous. refactor it!
-		if (!time) time = ping_function.le(((t=ping_file(rc.p).last())&&t.time) || now())
-		var last = time; time = ping_function.next()
-		if (!(time <= now())) {setTimeout(λ,500); return}
-
-		print((++count)+': PING!',m(time*1000).format('YYYY-MM-DD/HH:mm:ss'),'gap',format_dur(time-last))
-
-		if (time < now() - 60) {
-			ping_file(rc.p).append({time:time, period:rc.period, tags:'afk RETRO'})
-			setTimeout(λ,0,time)
-		} else {
-			prompt({time:time,last_doing:(t=ping_file(rc.p).last())&&t.tags},function(e,args){
-				ping_file(rc.p).append({time:time, period:rc.period, tags:args.tags})
-				if (args.tags==='') edit(rc.p)
-				// if (args.canceled) //! do something?
-				tt_sync()
-				setTimeout(λ,0,time)
-			})
-		}
+	var n; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=ping_function.le(n))),'ago, at',m(t*1000).format('HH:mm:ss'))
+	ping_function.le(((t=ping_file(rc.p).$[-1])&&t.time) || now())
+	;(function λ(){
+		var time = ping_function.next()
+		if (time <= now()) ping(time,function(){setImmediate(λ)})
+		else {var next = ping_function.next(); setTimeout(ping,(next-now())*1000,next,function(){setImmediate(λ)})}
 		})() }
+
+var ping = function(time,cb){
+	print('ping! for',m(time*1000).toISOString(),'at',m().toISOString())
+	if (time < now() - 60) {
+		ping_file(rc.p).append({time:time, period:rc.period, tags:'afk RETRO'})
+		setImmediate(cb)
+	} else {
+		prompt({time:time,last_doing:(t=ping_file(rc.p).$[-1])&&t.tags},function(e,args){
+			ping_file(rc.p).append({time:time, period:rc.period, tags:args.tags})
+			if (args.tags==='') edit(rc.p)
+			// if (args.canceled)
+			tt_sync()
+			cb()
+		})
+	} }
 
 var prompt_fn // defined in main
 var prompt = function(v,cb){
@@ -241,17 +241,17 @@ var prompt = function(v,cb){
 	prompt_fn(v,function(e,args){
 		if (rc.macros) {var m = typeof(rc.macros)==='string'? JSON.parse(fs(rc.macros).$) : rc.macros; args.tags = args.tags.split(' ').map(function(v){return m[v]||v}).join(' ');} cb(e,args)})}
 
-var tt_sync = function(){
+var tt_sync = function(cb){
 	print(divider(' synchonizing beeminder graphs with local logfile '))
-	sync_bee()
+	sync_bee(cb)
 	}
-var sync_bee = function(){
+var sync_bee = function(cb){
 	// the log file → [{time: period: tags:}]
-	var logfile_pings = function(){return ping_file(rc.p).all()}
+	var logfile_pings = function(){return ping_file(rc.p).$}
 	// beeminder api datapoints → [{time: period: tags: id: group:}]
 	var beeminder_pings = function(datapoints){
-		return _.flatten(datapoints.filter(function(v){return v.value!==0}).filter(function(v){return v.comment!=='fake'}).map(function(v){
-			var pings = v.comment.match(/pings?:(.*)/)[1].trim().split(', ')
+		return _.flatten(datapoints.filter(function(v){return v.value!==0}).filter(function(v){return v.comment.match(/pings?:/)}).map(function(v){
+			var pings = v.comment.match(/pings?:(.*)/)[1].trim().replace(/ \[..:..:..\]$/,'').split(', ')
 			var r = pings.map(function(t){return {time:v.timestamp, period:v.value*60/pings.length, tags:t, id:v.id}})
 			r.map(function(v){v.group = r})
 			return r}),true) }
@@ -309,9 +309,9 @@ var sync_bee = function(){
 		var ymd = function(v){return m.utc(v.timestamp*1000).format('YYYY-MM-DD')}
 		return {
 			msgs: [
-				CREATE.map(function(v){return '+ CREATE: '+ymd(v)+' '+v.comment}),
-				UPDATE.map(function(v){return '= UPDATE: '+ymd(v[2])+' '+v[2].comment}),
-				DELETE.map(function(v){return '- DELETE: '+ymd(v)+' '+v.id}),
+				CREATE.map(function(v){return '+ '+user_slug+' '+ymd(v)+' '+v.comment}),
+				UPDATE.map(function(v){return '= '+user_slug+' '+ymd(v[2])+' '+v[2].comment}),
+				DELETE.map(function(v){return '- '+user_slug+' '+ymd(v)+' '+v.id}),
 				].m_concat(),
 			cmds: [
 				[[user_slug+'.datapoints ~=',CREATE]],
@@ -322,33 +322,28 @@ var sync_bee = function(){
 
 	async.parallel(Object.keys(rc.beeminder).filter(function(v){return v.indexOf('/')!==-1}).map(function(user_slug){return function(cb){
 		beeminder(user_slug+'.datapoints',function(e,v){if (e) cb(e,v); else {
-			cb(0,{user_slug:user_slug,
-				actions: generate_actions(
-					user_slug,
-					logfile_pings().filter(function(v){return tagdsl_eval(rc.beeminder[user_slug],v.tags)}),
-					beeminder_pings(v))
-				}) }}) }}),
+			cb(null,generate_actions(
+				user_slug,
+				logfile_pings().filter(function(v){return tagdsl_eval(rc.beeminder[user_slug],v.tags)}),
+				beeminder_pings(v)))
+				}}) }}),
+		10,
 		function(e,action_sets){
-			action_sets.map(function(v){
-				print(divider(' updating bmndr/'+v.user_slug+' '))
-				v.actions.msgs.map(function(v){print(v.slice(0,80))})
-			})
-			if (!args.dry_run) async.parallel(action_sets.map(function(v){return v.actions.cmds}).m_concat().map(function(v){return function(cb){beeminder.apply(null,v.concat([cb]))}}))
+			_.pluck(action_sets,'msgs').m_concat().map(function(v){print(v.slice(0,80))})
+			if (!args.dry) async.parallelLimit(_.pluck(action_sets,'cmds').m_concat().map(function(v){return function(cb){beeminder.apply(null,v.concat([cb]))}}),10,cb)
+			else setImmediate(cb)
 		})
 	}
 
-var merge = function(fl){
-	print('merging',fs(fs(fl).realpath()).path,'into',fs(fs(rc.p).realpath()).path)
-	if (!args.dry_run) ping_file(rc.p).write(_.sortBy(ping_file(rc.p).all().concat(ping_file(fl).all()),'time')) }
+var merge = function(fl){print('merging',fl,'into',rc.p); if (!args.dry) ping_file(rc.p).$ = _.sortBy(ping_file(rc.p).$.concat(ping_file(fl).$),'time')}
 
 module.exports.main = function(args){
 	prompt_fn = args.prompt
 	var argv = args.argv
 	switch (argv[0]) {
 		case undefined: run_pings(); break
-		case 'prompt' : prompt({time:i(argv[1]), last_doing:argv[2]},function(e,args){print(args.tags)}); break
-		case 'sync'   : tt_sync(); process.exit(); break
+		case 'prompt' : prompt({time:argv[1]? i(argv[1]) : now(), last_doing:argv[2]},function(e,args){print(args.tags)}); break
+		case 'sync'   : tt_sync(); break
 		case 'merge'  : merge(argv[1]); break
-		case 'e'      : print(eval(argv.slice(1).join(' '))); break
-		default       : print('usage: tagtime.js (sync | merge <file>)? (--settings <file>)? (--dry-run)?'); break
+		default       : print('usage: ./run.sh (| prompt <time>? <last_doing>? | sync --dry? | merge --dry? <file>) (--settings <file>)?'); break
 	} }

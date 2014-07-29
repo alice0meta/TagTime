@@ -48,7 +48,7 @@
 	}); return r}
 
 	var return_and_close = function(tags,canceled){
-		tags = canceled? 'missing_ping' :
+		tags = canceled? 'canceled' :
 			((tags=tags||$('#tags').text())==='"'? last_doing : tags).trim().split(/\s+/).join(' ')
 		win.close(true)
 		global.ping_args.cb(null,{tags:tags,canceled:canceled})}
