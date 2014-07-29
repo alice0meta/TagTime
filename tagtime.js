@@ -320,7 +320,7 @@ var sync_bee = function(cb){
 				].m_concat(),
 			} }
 
-	async.parallel(Object.keys(rc.beeminder).filter(function(v){return v.indexOf('/')!==-1}).map(function(user_slug){return function(cb){
+	async.parallelLimit(Object.keys(rc.beeminder).filter(function(v){return v.indexOf('/')!==-1}).map(function(user_slug){return function(cb){
 		beeminder(user_slug+'.datapoints',function(e,v){if (e) cb(e,v); else {
 			cb(null,generate_actions(
 				user_slug,
