@@ -4,11 +4,19 @@
 var gui = require('nw.gui')
 var nw_window = gui.Window
 var win = nw_window.get()
+var _ = require('underscore')
 var tagtime = require('./tagtime.js')
 
+var hash = function(v){return v.hasOwnProperty('__hash__')? v.__hash__ : (v.__hash__ = Math.random().toString(36).slice(2))}
+var subs = {}
+var pub = global.pub = function(topic,v){subs[topic] && _.values(subs[topic]).forEach(function(sub){sub(v)})}
+var sub1 = global.sub1 = function(topic,cb){var t = (subs[topic] = subs[topic] || {}); t[hash(cb)] = function(v){delete(t[hash(cb)]); cb(v)}}
+
 tagtime.main({argv:gui.App.argv, prompt:function(args,cb){
-	global.ping_args = args
-	global.ping_args.cb = function(e,v){win.setShowInTaskbar(false); cb(e,v)}
+	sub1('ping_prompt',function(v){
+		v.init(args)
+		var t = v.show; v.show = function(cb){t(function(e,v){win.setShowInTaskbar(false); cb(e,v)})}
+		cb(null,v)})
 	var ping_win = nw_window.open('ping.html',{frame:false, 'always-on-top':true, min_width:50, min_height:20, show:false})
 	win.setShowInTaskbar(true)
 	}})

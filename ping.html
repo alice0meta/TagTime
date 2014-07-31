@@ -3,7 +3,7 @@
 	<meta charset="utf-8">
 <style>
 	/* behavior */
-	body {margin:8px; overflow-y:hidden; white-space:nowrap;}
+	body {margin:8px;  white-space:nowrap;}
 	body {-webkit-app-region:drag;} .expando_input, button {-webkit-app-region:no-drag;}
 	#body {display:inline-block;}
 	
@@ -12,80 +12,203 @@
 
 	/* style */
 	p {margin:0;}
-	body, button, .expando_input {background-color:#222; color:#fff; font-family:Monaco,monospace; font-size:12px; outline:none;}
-	button {background-color:#333; border:1px solid #666; cursor:pointer;}
+	body, button {background-color:#222; color:#fff; font-family:Monaco,monospace; font-size:12px;}
+	body, button, .expando_input {outline:none;}
+	button {background-color:#333; border:1px solid #666; cursor:pointer; padding:2px 4px;}
 	button.inline {margin:-1px -3px; padding:0 2px;}
-	.tagstr {color:#0ff;}
-	.warning {background-color:#b00; color:#ffd700; margin:0 -100% 4px; padding:0 100%; text-align: center;}
-	.warning_outer {max-width:100%; overflow-x:hidden; margin:0 -8px; padding:0 8px;}
-</style></head><script>
-	var gui = require('nw.gui')
-	var m = require('moment')
-	var win = gui.Window.get()
-	var jquery = require('jquery'); var $ = function(v){return jquery(v,document)}
-	var exec = require('child_process').exec
+	.tag_editor {margin:5px;} ol.tag_editor {padding:0; list-style:none;}
+	.tags_in_li {display:inline-block; vertical-align:bottom; margin:0 0 0 1ch;}
+	.warning {background-color:#b00; color:#ffd700;}
+	.key {background-color:#333; border:1px solid #666; padding:0 0.5ch 0 0.4ch; border-radius:0.5ch;}
+	.curr_line {background-color:#444;} li.curr_line {margin:0 -13px; padding:0 13px;}
+	.tagstr, .tags_in {color:#0ff;}
+</style></head>
+<body><div id='body'></div></body></html>
+<script>
 
-	var W = document.write.bind(document)
-	var print = function(){process.stdout.write(Array.prototype.slice.call(arguments).join(' ')+'\n')}
-	var c_log = function(){console.log.apply(console,arguments); window.__ = arguments[arguments.length-1]}
-	jquery.prototype.focus_end = function(){var t = document.createRange(); t.selectNodeContents(this[0]); t.collapse(false); var u = window.getSelection(); u.removeAllRanges(); u.addRange(t)}
+var gui = require('nw.gui')
+var m = require('moment')
+var win = gui.Window.get()
+var t = require('jquery'); var $ = function(v){return t(v,document)}; $.__proto__ = t; $.prototype = t.prototype
+var exec = require('child_process').exec
+var _ = require('underscore')
 
-	var time = global.ping_args.time
-	var last_doing = global.ping_args.last_doing
-	var late = time + 10 <= m()/1000
-</script><body><div id='body'>
-	<script>if (late) W('<div class="warning_outer"><div class="warning">!! this ping is '+Math.round(m()/1000-time)+' seconds late !!</div></div>')</script>
-	<p>It's tag time! What are you doing RIGHT NOW (<script>W(m(time*1000).format('HH:mm:ss'))</script>)?</p>
-	<script>if (last_doing) W('<p>Ditto <button id=ditto class="inline">(<span class="tagstr">"</span>)</button> to repeat prev tags: <span class="tagstr">'+last_doing+'</span></p>')</script>
-	<div style="margin:5px"><div id=tags class="expando_input tagstr" contenteditable="true"></div></div>
-</div></body></html><script>
+var A = function(v){return Array.prototype.slice.call(v)}
+var print = function(){process.stdout.write(A(arguments).join(' ')+'\n')}
+var c_log = function(){console.log.apply(console,arguments); window.__ = A(arguments)[-1]}
+$.prototype.focus_end = function(){this.focus(); var t = document.createRange(); t.selectNodeContents(this[0]); t.collapse(false); var u = window.getSelection(); u.removeAllRanges(); u.addRange(t); return this}
+$.prototype.on_key = function(key,cb0){
+	var t = {'⇥':[9,'↓'],'↩':[13],'⎋':[27,'↑'],'←':[37,'↓'],'↑':[38,'↓'],'→':[39,'↓'],'↓':[40,'↓']}
+	var keyc = t[key]? t[key][0] : (typeof(key)==='number'? key : key.charCodeAt(0))
+	this[(t[key]?{'↑':'keyup','↓':'keydown'}[t[key][1]]:0)||'keypress'](function(e){if (e.which===keyc) return cb0(e)}) }
+var now = function(){return new Date()/1000}
+win.showf = function(){win.show(); win.focus()}
+Array.prototype.zipmap = function(f,ctx){return _.zip.apply(_,this).map(function(v){return f.apply(ctx,v)})}
+
+//! copied
+Function.prototype.in = function(time){var args = Array.prototype.slice.call(arguments).slice(1); return !time || time<=0? (setImmediate||setTimeout).apply(null,[this].concat(args)) : setTimeout.apply(null,[this,time*1000].concat(args))}
+Function.prototype.at = function(time){arguments[0] -= now(); return this.in.apply(this,arguments)}
+Function.prototype.every = function(time){var args = Array.prototype.slice.call(arguments).slice(1); return setInterval.apply(null,[this].concat(args))}
+Function.prototype.def = function(m,get,set){Object.defineProperty(this.prototype,m,{configurable:true, enumerable:false, get:get, set:set}); return this}
+;[Array,String].forEach(function(Class){_.range(0,5).forEach(function(i){Class.def('-'+i,function(){return this.length<i? undefined : this[this.length-i]},function(v){return this.length<i? v : this[this.length-i] = v})})})
+var tags_split = function(v){return v.trim().split(/ +/)}
+var tags_union = function(a,b){return _.union(tags_split(a),tags_split(b)).join(' ').trim()}
+
+var late      = function(v){return Math.abs(now()-v.time) > 10}
+var very_late = function(v){return Math.abs(now()-v.time) > 86400/3}
+
+var args
+var prev_ping
+var pings = []
+var shown
+
+//! this file is a monstrous mess
+//! can we unify ping object tags and element tags?
+
+var build_window = function(){
 	var L = function(a,b){a = 'IDS_'+a+'_MAC'; return b? nwDispatcher.getNSStringFWithFixup(a,b) : nwDispatcher.getNSStringWithFixup(a)}
 	var menu = function(args,v){var r = args? new gui.Menu(args) : new gui.Menu(); v.forEach(function(v){
 		var t = {label:v[0]}
-		if (v[1]) {t.modifiers = v[1].split('').slice(0,-1).map(function(v){return v.replace(/⌘/g,'cmd').replace(/⇧/g,'shift').replace(/⌥/g,'alt').replace(/\^/g,'ctrl')}).join('-'); t.key = v[1].slice(-1)[0]}
-		if (typeof(v[2])==='string') t.selector = v[2]; else if (typeof(v[2])==='function') t.click = v[2]; else t.submenu = v[2]
+		if (v[1]) {t.modifiers = v[1].split('').slice(0,-1).map(function(v){return v.replace(/⌘/g,'cmd').replace(/⇧/g,'shift').replace(/⌥/g,'alt').replace(/\^/g,'ctrl')}).join('-'); t.key = v[1][-1]}
+		if (typeof(v[2])==='string') t.selector = v[2]
+		else if (typeof(v[2])==='function') {t.click = v[2]; if ({'⎋':1}[v[1]]) $(window).on_key(v[1],t.click)}
+		else t.submenu = v[2]
 		r.append(new gui.MenuItem(t))
 	}); return r}
 
-	var return_and_close = function(tags,canceled){
-		tags = canceled? 'canceled' :
-			((tags=tags||$('#tags').text())==='"'? last_doing : tags).trim().split(/\s+/).join(' ')
-		win.close(true)
-		global.ping_args.cb(null,{tags:tags,canceled:canceled})}
-	win.on('close',function(){return_and_close(null,true)})
+	win.menu = menu({type:'menubar'},[
+		['',0,menu(0,[
+			['Cancel','⎋',function(){win.close()}],
+			['Cancel','⌘w','performClose:'],
+			['Cancel','⌘q','performClose:'],
+			['DevTools','⌘⌥i',function(){win.isDevToolsOpen()? win.closeDevTools() : win.showDevTools()}],
+			['DevTools','⌘;',function(){win.isDevToolsOpen()? win.closeDevTools() : win.showDevTools()}],
+			])],
+		[L('EDIT_MENU'),0,menu(0,[
+			[L('EDIT_UNDO'), '⌘z', 'undo:'],
+			[L('EDIT_REDO'), '⌘⇧z', 'redo:'],
+			[L('CUT'), '⌘x', 'cut:'],
+			[L('COPY'), '⌘c', 'copy:'],
+			[L('PASTE'), '⌘v', 'paste:'],
+			[L('EDIT_SELECT_ALL'), '⌘a', 'selectAll:'],
+			])],
+		])
 
-	$(document).ready(function(){
-		$('#tags').focus()
-		$(document).on('click',function(e){$('#tags').focus_end()})
-		$('#tags').on('click',function(e){e.stopPropagation()})
+	win.on('close',function(){try {return_and_close(true)} catch (e) {win.close(true); args.cb(e); throw e}})
 
-		$('#tags').keypress(function(e){if (e.which===13) return_and_close()}) // enter key
-		$('#ditto').on('click',function(){return_and_close('"')})
+	$(window).mouseenter(win.showf)
 
-		$(document).mouseenter(function(){win.show(); win.focus()})
+	var macros = function λ(){return typeof(args.macros)==='string'? λ._ && λ.stale > now() - 5? λ._ : (λ.stale=now(),λ._=JSON.parse(global.fs(args.macros).$)) : args.macros}
+	if (args.macros) (function(){if (shown && $('.tags_in').length>0) {var m = macros(); $('.tags_in').map(function(i,v){var t=$(v).text(); if (t=t.match(/^(.*?)(\S+) $/)) $(v).text(t[1]+(m[t[2]]||t[2])+' ')})}}).every(0.2)
+	}
 
-		win.menu = menu({type:'menubar'},[
-			['',0,menu(0,[
-				['Cancel','⎋','performClose:'],
-				['Cancel','⌘w','performClose:'],
-				['Cancel','⌘q','performClose:'],
-				['DevTools','⌘⌥i',function(){win.isDevToolsOpen()? win.closeDevTools() : win.showDevTools()}],
-				])],
-			[L('EDIT_MENU'),0,menu(0,[
-				[L('EDIT_UNDO'), '⌘z', 'undo:'],
-				[L('EDIT_REDO'), '⌘⇧z', 'redo:'],
-				[L('CUT'), '⌘x', 'cut:'],
-				[L('COPY'), '⌘c', 'copy:'],
-				[L('PASTE'), '⌘v', 'paste:'],
-				[L('EDIT_SELECT_ALL'), '⌘a', 'selectAll:'],
-				])],
+var regenerate = function(cb){var t
+	if (pings.length>0 && prev_ping===undefined && args.ping_before) args.ping_before(pings[0].time,function(ping){prev_ping = ping||null; regenerate(cb)})
+	else if (shown){
+		var S = function(c){return $('<span class="'+c+'">')}
+		var Key = function(v){return S('key').html(v)}
+		var Expando_input = function(co,ci){return $('<div class="'+co+'"><div class="expando_input '+ci+'" contenteditable="true"></div></div>')}
+
+		if (!$('#body').is(':empty')) {
+			$('#body').html('')
+			$(window).off()
+		}
+
+		if (pings.length===1) {
+			var v = pings[0]
+			$('#body').html([
+				$('<p>').html(["It's tag time! What are you doing RIGHT NOW (",S(late(v)?'warning':'').html(m(v.time*1000).format((very_late(v)?'YYYY-MM-DD/':'')+'HH:mm:ss')),')?']),
+				prev_ping? $('<p>').html([Key("'"),' to repeat previous tags: ',$('<button id="ditto" class="inline tagstr">').text(prev_ping.tags)]) : '',
+				Expando_input('tag_editor','tags_in'),
 			])
-		$(document).keyup(function(e){if (e.keyCode===27) win.close()})
-		var x;var y; win.resizeTo(x=$('#body').width()+16,y=$('#body').height()+16)
-		win.moveTo(Math.round((window.screen.width-x)/2),Math.round((window.screen.height-y)/2))
-		win.setResizable(false)
 
-		new Audio(global.ping_args.ping_sound).play()
-		setTimeout(function(){win.show(); win.focus()},200)
+			$('.tags_in').focus_end()
+			$(window).on('click',function(e){$('.tags_in').focus_end()})
+			$('.tags_in').on('click',function(e){e.stopPropagation()})
+
+			$('.tags_in').on_key('↩',function(e){if ($('.tags_in').text()!=='') return_and_close(); return false})
+			if (prev_ping) {
+				var ditto = function(){$('.tags_in').text(tags_union($('.tags_in').text(),prev_ping.tags)); return_and_close()}
+				$('#ditto').on('click',ditto)
+				$(window).on_key("'",function(e){e.preventDefault(); ditto()})
+				}
+			$(window).on_key('⇥',function(e){return false})
+			$(window).on_key('↑',function(e){pings.unshift(prev_ping); prev_ping = undefined; regenerate()})
+
+			var x; var y; win.setResizable(true); win.resizeTo(x=$('#body').width()+16,y=$('#body').height()+16); win.setResizable(false)
+			win.moveTo(Math.round((window.screen.width-x)/2),Math.round((window.screen.height-y)/2))
+		} else if (pings.length > 200 && confirm("oh dear, we're about to try to load "+pings.length+' ping boxes. Quit?')) {
+			alert('Quitting!'); win.close()
+		} else {
+			$('#body').html([
+				$('<p>').html("It's tag times! What were you doing RIGHT AT these times?"),
+				$('<p>').html([Key("'"),' to repeat previous tags',$('<span id="ditto_o">').html([': ',$('<button id="ditto" class="inline tagstr">')])]),
+				$('<ol class="tag_editor">').html(pings.map(function(v){return $('<li>').html([S().html(m(v.time*1000).format('HH:mm:ss')),Expando_input('tags_in_li','tags_in')])})),
+				$('<button id="submit">').text('submit all'),
+			])
+
+			var c_first = function(){return $('.tag_editor > *').first()}
+			var c_set = function(v){if (v!==cur) {cur&&cur.removeClass('curr_line'); cur = v; cur.addClass('curr_line')}}
+			var c_line = function(){return cur.is($('#submit'))? undefined : cur.find('.tags_in')}
+			var c_next = function(){var t; if (cur.is($('#submit'))) c_set(c_first()); else c_set((t=cur.next()).length!==0? t : $('#submit')); c_focus(); return false}
+			var c_prev = function(){var t; if (cur.is($('#submit'))) c_set($('.tag_editor > *').last()); else c_set((t=cur.prev()).length!==0? t : $('#submit')); c_focus(); return false}
+			var c_focus = function(){if (cur.is($('#submit'))) cur.focus(); else cur.find('.tags_in').focus_end()}
+			var cur; c_set(c_first())
+
+			c_focus()
+			$(window).on('click',function(e){c_focus()})
+			$('.tags_in').on('click',function(e){e.stopPropagation(); c_set($(this).closest('li'))})
+
+			//! we broke clicking
+			//! ditto text should go away when you go down
+			//! when to add afk to things?
+			//! when adding to the top and bottom, current selection should try to stay in the same place
+			//! resizing and/or moving the window flashes it white
+
+			$('.tags_in').on_key('↩',c_next)
+			$('.tags_in').on_key('⇥',c_next)
+			$('.tags_in').on_key('↓',c_next)
+			$('#submit').on_key('⇥',c_next)
+			$('#submit').on_key('↓',c_next)
+			$('.tags_in').on_key('↑',function(e){
+				if (cur.is(c_first())) {pings.unshift(prev_ping); prev_ping = undefined; regenerate()}
+				else c_prev()
+				return false})
+			$('#submit').on_key('↑',c_prev)
+			if (prev_ping) {
+				$('#ditto').text(prev_ping.tags)
+				var ditto = function(){var t; if (t=c_line()) {t.text(tags_union(t.text(),prev_ping.tags)); c_next()}}
+				$('#ditto').on('click',ditto)
+				$('.tags_in').on_key('\'',function(e){e.preventDefault(); ditto()})
+			} else {
+				$('#ditto_o').hide()
+			}
+			$('#submit').on('click',function(e){e.stopPropagation(); return_and_close()})
+
+			win.setResizable(true)
+			var x = $('#body').width()+16
+			var y = $('#body').height()+16
+			win.setMaximumSize(x,y)
+			win.setMinimumSize(x,20)
+			win.resizeTo(x,y=Math.min(y,Math.round(x*1.5)))
+			win.moveTo(Math.round((window.screen.width-x)/2),Math.round((window.screen.height-y)/2))
+		}
+		cb&&cb()
+	}
+	}
+
+var beep = function(){if (shown) new Audio(args.sound).play()}
+
+var return_and_close = function(canceled){
+	if ($('.tags_in').length === pings.length) [pings,$('.tags_in').toArray().map(function(v){return $(v).text()})].zipmap(function(v,tags){v.tags = tags})
+	if (canceled) pings.forEach(function(v){v.tags = tags_union(v.tags,'canceled')})
+	win.close(true)
+	args.cb(null,pings)}
+
+global.pub('ping_prompt',{
+	init:function(args_){args = args_; build_window()},
+	ping:function(ping){pings.push(ping); regenerate(); beep()},
+	show:function(cb){args.cb = cb; shown = true; regenerate(function(){beep(); win.showf.in(0.2)})},
 	})
+
 </script>
