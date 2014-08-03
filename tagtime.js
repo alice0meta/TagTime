@@ -1,12 +1,14 @@
+var util = require('util')
+var exec = require('child_process').exec
 var async = require('async')
 var m = require('moment')
 var minimist = require('minimist')
 var _ = require('underscore')
-var exec = require('child_process').exec
 
 // sometime eventually:
-// expand reset_before to make ping_function faster to start up
+// expand reset_before to make ping_seq faster to start up
 // instead of ignoring non-parsed beeminder graph pings, maybe zero the datapoints and annotate the comment? like, 28 1 "foo" → 28 0 "foo [was 1; zeroed by tagtime syncing]"
+// concurrency oh god
 
 // roadmapy:
 // we want to deploy to windows, osx, linux, webapp, android, and ios
@@ -22,6 +24,8 @@ var exec = require('child_process').exec
 // maybe prepare the gui beforehand so that we can make it come up on exactly the right instant?
 // maybe separate the processes *again* to get rid of that blur bug
 // tray menu! https://gist.github.com/halida/9634676
+// email tagtime? for ios, until we properly deploy to ios?
+// if we make a web request and it doesn't work, we need to not crash
 
 // todo:
 // //! comments
@@ -32,6 +36,7 @@ var exec = require('child_process').exec
 // btw, we should have a logfile
 // danny's rc.beeminder dsl is observed to only contain tag, (& tags), (| tags), and (! tag)
 // it's actually finally clear how to separate this into different files
+// users really want "only run during certain hours"
 
 // most urgent todo:
 // [mendoza] [0.2.0] pings_if(): skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level (current afk behavior is undesirable in many ways)
@@ -52,6 +57,7 @@ var exec = require('child_process').exec
 	String.prototype.repeat = function(v){return new Array(v+1).join(this)}
 	global.pad = function(v,s){return v+s.slice(v.length)}
 	global.argv = {_:process.argv.slice(4)}
+	global.ζ0_def = function(o,m,get,set){Object.defineProperty(o,m,{configurable:true, enumerable:false, get:get, set:set}); return o}
 	Function.prototype.def = function(m,get,set){Object.defineProperty(this.prototype,m,{configurable:true, enumerable:false, get:get, set:set}); return this}
 	;[Array,String].forEach(function(Class){_.range(0,5).forEach(function(i){Class.def('-'+i,function(){return this.length<i? undefined : this[this.length-i]},function(v){return this.length<i? v : this[this.length-i] = v})})})
 	var Path = function Path(path){this._path = path.replace(/^~\//,process.env.HOME+'/')}
@@ -75,7 +81,7 @@ var exec = require('child_process').exec
 	global.ζ0_memb_Emod_obj = function(o,m,f){o[m] = f(o[m]); return o}
 	Array.prototype.ζ0_concat = function(){return Array.prototype.concat.apply([],this)}
 	global.ζ0_int = function(v){return parseInt(v)}
-//===---===// other copypasted (lang-alpha, stopwatch, daemon.html) //===--===//
+//===------===// other copypasted (lang-alpha, stopwatch, .html) //===-----===//
 	var merge_o = function(a,b){var r = {}; Object.keys(a).forEach(function(k){r[k] = a[k]}); Object.keys(b).forEach(function(k){r[k] = b[k]}); return r}
 	var seq = function(v){return typeof v === 'string'? v.split('') : v instanceof Array? v : Object.keys(v).map(function(k){return [k,v[k]]})}
 	var frequencies = function(v){return v.reduce(function(r,v){r[v] = v in r? r[v]+1 : 1; return r},{})}
@@ -88,7 +94,7 @@ var exec = require('child_process').exec
 		var d = Math.floor(v/60/60/24), h = Math.floor(v/60/60)%24, m = Math.floor(v/60)%60, s = v%60
 		return [d+'d',pad(h+'','0',2)+'h',pad(m+'','0',2)+'m',pad(s+'','0',2)+'s'].slice(d>0?0:h>0?1:m>0?2:3).join('')}
 	Array.prototype.m_concat = function(){return Array.prototype.concat.apply([],this)}
-	var print = function(){process.stdout.write(Array.prototype.slice.call(arguments).join(' ')+'\n'); return arguments[arguments.length-1]}
+	var A = function(v){return Array.prototype.slice.call(v)}
 
 //===---------------------------===// util //===---------------------------===//
 
@@ -96,15 +102,16 @@ var i = function(v){return parseInt(v)}
 var is = function(v){return v!==undefined}
 var err = function(v){print.apply(null,['#err#'].concat(arguments)); throw Error(v)}
 var pluralize = function(n,noun){return n+' '+noun+(n==1?'':'s')}
-var divider = function(v){ // 'foo' → '-----foo-----' of length 79
-	var left = Math.floor((79 - v.length)/2), right = 79 - left - v.length
-	return '-'.repeat(left)+v+'-'.repeat(right)}
-// var escape_regex = function(v){return v.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1')}
-// String.prototype.replace_all = function(find,replace){return this.replace(new RegExp(escape_regex(find),'g'),replace)}
 var bit_reverse_i = function(length,v){var r = 0; for (var i=0;i<length;i++){r = (r << 1) | (v & 1); v = v >> 1}; return r}
 Function.prototype.in = function(time){var args = Array.prototype.slice.call(arguments).slice(1); return !time || time<=0? (setImmediate||setTimeout).apply(null,[this].concat(args)) : setTimeout.apply(null,[this,time*1000].concat(args))}
 Function.prototype.at = function(time){arguments[0] -= now(); return this.in.apply(this,arguments)}
 Function.prototype.every = function(time){var args = Array.prototype.slice.call(arguments).slice(1); return setInterval.apply(null,[this,time*1000].concat(args))}
+var print = function(){var a = A(arguments)
+	process.stdout.write(a.map(function(v){return typeof(v)==='string'? v : util.inspect(v,{colors:true,depth:6})}).join(' ')+'\n')
+	if (typeof(window)!=='undefined') window.__ = a
+	return a[-1]}
+Object.getOwnPropertyNames(Math).forEach(function(v){global[v] = Math[v]})
+_.jclone = function(v){return v===undefined? v : JSON.parse(JSON.stringify(v))}
 
 //===---------------------===// tt-specific util //===---------------------===//
 
@@ -127,14 +134,12 @@ if (!fs(args.settings).exists()) {
 try {var rc = JSON.parse((fs(args.settings).$+'').replace(/\/\/.*/g,''))}
 catch (e) {print('ERROR: bad rc file:',e); process.exit(1)}
 
-rc.seed = 666; //Math.round(Math.random()*2200) + 800
-// if (!((1 <= rc.seed && rc.seed < 566) || rc.seed===666 || (766 <= rc.seed && rc.seed < 3000))) {print('ERROR: seeds probably should be positive, not too close to each other, and not too big (seed:',rc.seed+'). How about',(1000 + Math.round(Math.random()*2000))+'?'); process.exit(1)}
-
 rc.p = rc.ping_file
 if (!fs(rc.p).exists()) fs(rc.p).$ = ''
 
 rc.ping_sound = rc.ping_sound || 'loud-ding.wav'
 
+//! do discard this if danny's accepted multieditor
 // var macro_replace_all = function(pings){
 // 	var m = typeof(rc.macros)==='string'? JSON.parse(fs(rc.macros).$) : rc.macros
 // 	if (m) pings.forEach(function(v){v.tags = tags_split(v.tags).map(function(v){return m[v]||v}).join(' ')})
@@ -151,6 +156,7 @@ var beeminder = (function(){
 		var t = path.match(/^(.*?)(\/.*)$/); var host = t[1]; path = t[2]
 		query = seq(query).map(function(v){return encodeURIComponent(v[0])+'='+encodeURIComponent(v[1])}).join('&')
 		path = path+(query===''?'':'?'+query)
+		//! add log statement here
 		http_.request({host:host,path:path,headers:headers,method:method},function(resp){
 			var t = []; resp.on('data', function(chunk){t.push(chunk)}); resp.on('end', function(){
 				t = t.join('')
@@ -189,82 +195,63 @@ var ping_file = (function(){
 	r.prototype.append = function(v){fs(this.fl).append(stringify(v)+'\n'); return this}
 	return function(fl){return new r(fl)}})()
 
-var ping_function = (function(){
-	var ping_next = function(ping){
-		// see p37 of Simulation by Ross
-		ping.seed = Math.pow(7,5)*ping.seed % (Math.pow(2,31)-1) // ran0 from Numerical Recipes
-		ping.time += Math.round(Math.max(1,-45*60*Math.log(ping.seed / (Math.pow(2,31)-1))))
-		}
-	var keep = function(v){return !v.fraction || bit_reverse_i(31,v.seed) / (Math.pow(2,31)-1) <= v.fraction}
-	var next_s = function(v){
-		var existing = _.pluck(seqs,'time')
-		do {ping_next(v)} while (!keep(v))
-		while (_.contains(existing,v.time)) v.time += 1
-		}
-
-	var t = 45 / rc.period; var seq_count = Math.ceil(t); var seq_fraction = 1-(seq_count-t)
+var ping_seq = (function(period){
+	var epoch = {seed:666, time:1407043800} // the birth of timepie/tagtime!
+	// var epoch = {seed:666, time:1184083200} // the birth of timepie/tagtime!
+	var ping_next = function(ping){ // see p37 of Simulation by Ross
+		ping.seed = pow(7,5)*ping.seed % (pow(2,31)-1) // ran0 from Numerical Recipes
+		ping.time += round(max(1,-45*60*log(ping.seed / (pow(2,31)-1))     /    100   )) } //!
+	var keep = function(v){return !v.fraction || bit_reverse_i(31,v.seed) / (pow(2,31)-1) <= v.fraction}
+	var next_s = function(v){var existing = _.pluck(seqs,'time'); do {ping_next(v)} while (!keep(v)); while (_.contains(existing,v.time)) v.time += 1; return v}
+	
 	var seqs
-	var reset_before = function(time){
-		seqs = _.range(seq_count).map(function(v){return {seed:rc.seed+v, time:1184083200}}); seqs.forEach(next_s) // the birth of timepie/tagtime!
-		if (seq_fraction!==1) seqs[-1].fraction = seq_fraction
-		}
-	var get = function(){var r = _.min(seqs,function(v){return v.time}).time; return r}
+	var reset_before = function(time){if (!seqs || time < getv()) {
+		var n = 45 / period
+		seqs = _.range(ceil(n)).map(function(v){var t = _.clone(epoch); t.seed += v; return t}).map(next_s)
+		if (ceil(n)-n !== 0) seqs[-1].fraction = 1-(ceil(n)-n)
+		}}
+	var getv = function(){var r = _.min(seqs,function(v){return v.time}).time; return r}
+	var get = function(){return {time:getv(), period:period}}
 	var next = function(){next_s(_.min(seqs,function(v){return v.time}))}
 	
 	reset_before(now())
-
-	return {
-		// time → nearest ping time ≤ time
-		le: function(time){
-			if (get() > time) reset_before(time)
-			while (true) {var prev_seqs = JSON.parse(JSON.stringify(seqs)); next(); if (get() > time) {seqs = prev_seqs; break}}
-			return get()},
-		// get the next ping
+	return ζ0_def({
+		le: function(time){reset_before(time); while (true) {var t = _.jclone(seqs); next(); if (getv() > time) {seqs = t; break}}; return get()},
 		next: function(){next(); return get()},
-	} })()
+		}, '0', function(){return get()}
+	) })(rc.period)
 
 //===--===// fns loosely corresponding to the original architecture //===--===//
 
-// pings at appropriate times and logs pings to the ping file and syncs with beeminder
-var schedule_pings = function(){var t
-	var n; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=ping_function.le(n))),'ago, at',m(t*1000).format('HH:mm:ss'))
-	ping_function.le(((t=ping_file(rc.p).$[-1])&&t.time) || now())
-	;(function λ(){var t=ping_function.next();
-		print('looping @',m().toISOString(),'to',m(t*1000).toISOString())
-		ping.at(t,t,function(){λ.in()})})()
-	}
-//  //!
-// common cases:
-// 	waking up and filling in sleep pings
-// 	opening computer monday morning
-// 		(do sanity check; you don't want to try to spawn fifty thousand lines)
-// 	wanting to refer to tags from a few pings ago
-// 	pinged you while you're typing
-// 	?
+var start_pings = function(){var t
+	var n; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=ping_seq.le(n).time)),'ago, at',m(t*1000).format('HH:mm:ss'))
+	ping_seq.le(((t=ping_file(rc.p).$[-1])&&t.time) || now()) }
+var schedule_pings = function λ(){var ps = ping_seq
+	print('starting again')
+	var already = []; while (ps[0].time <= now()) {already.push(ps[0]); ps.next()}
+	print('btw nextᵃ:',m(ps[0].time*1000).format('HH:mm:ss'))
+	if (already.length===0) λ.at(ps[0].time)
+	else prompt((function(pfl){return function(time,cb){var t; if (pfl.some(function(v){t=v; return v.time < time})) cb(t); else cb()}})(ping_file(rc.p).$.reverse().slice(0,200)),
+		function(e,gui){
+			already.map(gui.ping)
+			var λt; ;(function λ(){λt = (function(){if (gui.ping(ps[0])) {already.push(ps[0]); ps.next(); print('btw nextᵇ:',m(ps[0].time*1000).format('HH:mm:ss')); λ()}}).at(ps[0].time)})()
+			gui.show(function(e,pings){
+				clearTimeout(λt)
+				if (pings.length !== already.length) {print('eep! I think you scrolled up!'); pings = pings.slice(pings.length - already.length)} //!
+				pings.forEach(function(v){ping_file(rc.p).append(v)})
+				tt_sync()
+				λ()
+			})
+		}) }
 
-// but really, we want to open a prompt, and then give it times, and then maybe give it more times, and then receive a bunch of pings from it
-
-// do trim and such the output from ping.html
-
-var ping = function(time,cb){
-	print('ping! for',m(time*1000).toISOString(),'at',m().toISOString())
-	if (time <= now() - 120) {ping_file(rc.p).append({time:time, period:rc.period, tags:'afk'}); cb.in()}
-	else prompt(function(time,cb){cb(ping_file(rc.p).$[-1])},function(gui){
-		gui.ping({time:time, period:rc.period})
-		gui.show(function(e,pings){
-			if (pings.length>1) window.alert("we can't handle this!")
-			print(_.pluck(pings,'tags').join('\n')); process.exit()
-			ping_file(rc.p).append(pings[0])
-			// if (args.tags==='') edit(rc.p)
-			// if (args.canceled)
-			tt_sync()
-			cb()
-		}) }) }
+//! handle being pinged while you're typing
+//! do trim and such the output from ping.html
+//! care about afk vs don't care about afk modes?
 
 var prompt = function(ping_before,cb){prompt.impl({sound:rc.ping_sound, ping_before:ping_before, macros:rc.macros},cb)}
 
 var tt_sync = function(cb){
-	print(divider(' synchonizing beeminder graphs with local logfile '))
+	print('### synchonizing beeminder graphs with local logfile ###')
 	sync_bee(cb)
 	}
 var sync_bee = function(cb){
@@ -292,8 +279,8 @@ var sync_bee = function(cb){
 	var generate_actions = function(user_slug,f_pings,b_pings){var t
 		f_pings = _.sortBy(f_pings,'time') //! maybe don't need to sort these two?
 		b_pings = _.sortBy(b_pings,'time')
-		f_pings.map(function(v){v.group_time = Math.round(v.time/86400 - 2/3)*86400 + 86400*2/3})
-		b_pings.map(function(v){v.group_time = Math.round(v.time/86400 - 2/3)*86400 + 86400*2/3})
+		f_pings.map(function(v){v.group_time = round(v.time/86400 - 2/3)*86400 + 86400*2/3})
+		b_pings.map(function(v){v.group_time = round(v.time/86400 - 2/3)*86400 + 86400*2/3})
 		if (b_pings.some(function(v){return v.group_time!==v.time})) {print('ERROR: so confused'); throw '‽'}
 
 		var do_group = typeof(t=rc.beeminder.grouping)==='string'? _.contains(t.split(' '),user_slug) : t
@@ -352,7 +339,7 @@ var sync_bee = function(cb){
 				}}) }}),
 		10,
 		function(e,action_sets){
-			_.pluck(action_sets,'msgs').m_concat().map(function(v){print(v.slice(0,80))})
+			_.pluck(action_sets,'msgs').m_concat().map(function(v){print(v)})
 			if (!args.dry) async.parallelLimit(_.pluck(action_sets,'cmds').m_concat().map(function(v){return function(cb){beeminder.apply(null,v.concat([cb]))}}),10,cb)
 			else cb&&cb.in()
 		})
@@ -364,15 +351,18 @@ module.exports.main = function(args){
 	prompt.impl = args.prompt
 	var argv = args.argv
 	switch (argv[0]) {
-		case undefined: schedule_pings(); break
+		case undefined: start_pings(); schedule_pings(); break
 		case 'sync': tt_sync(); break
 		case 'merge': merge(argv[1]); break
 		case 'prompt':
 			var t = isNaN(i(argv[1])); var time = t? now() : i(argv[1]); var prev = argv.slice(t?1:2).join(' ')
 			prompt(prev&&function(time,cb){cb({time:time-2000,tags:prev})},function(e,gui){
 				gui.ping({time:time, period:45})
+				// gui.ping({time:time, period:45})
 				gui.show(function(e,pings){print(_.pluck(pings,'tags').join('\n')); if (!e) process.exit()})
 			})
 			break
 		default: print('usage: ./run.sh (| prompt <time>? <last_doing>? | sync --dry? | merge --dry? <file>) (--settings <file>)?'); break
 	} }
+
+//! process.on('uncaughtException',function(err){window.alert('tagtime is crashing (error code: sit by a lake)'); throw err})

@@ -12,6 +12,8 @@ var subs = {}
 var pub = global.pub = function(topic,v){subs[topic] && _.values(subs[topic]).forEach(function(sub){sub(v)})}
 var sub1 = global.sub1 = function(topic,cb){var t = (subs[topic] = subs[topic] || {}); t[hash(cb)] = function(v){delete(t[hash(cb)]); cb(v)}}
 
+//! win.showDevTools()
+
 tagtime.main({argv:gui.App.argv, prompt:function(args,cb){
 	sub1('ping_prompt',function(v){
 		v.init(args)
