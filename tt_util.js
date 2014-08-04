@@ -69,23 +69,18 @@ G.pluralize = function(n,noun){return n+' '+noun+(n==1?'':'s')}
 G.bit_reverse_i = function(length,v){var r = 0; for (var i=0;i<length;i++){r = (r << 1) | (v & 1); v = v >> 1}; return r}
 Object.getOwnPropertyNames(Math).forEach(function(v){global[v] = Math[v]})
 _.jclone = function(v){return v===undefined? v : JSON.parse(JSON.stringify(v))}
-var sprint = function(opt,v){return v.map(function(v){return typeof(v)==='string'? v : util.inspect(v,opt)}).join(' ')}
+var sprint = function(v,opt){return v.map(function(v){return typeof(v)==='string'? v : util.inspect(v,opt)}).join(' ')}
+G.A = function(v){return Array.prototype.slice.call(v)}
 G.print = function(){var a = A(arguments); process.stdout.write(sprint(a,{colors:true,depth:5})+'\n'); if (typeof(window)!=='undefined') window.__ = a; return a[-1]}
 
 //===---------------------===// tt-specific util //===---------------------===//
 
-G.log = print
+G.clog = print
+
 G.tags_split = function(v){return v.trim().split(/ +/)}
 G.tags_join = function(v){return v.join(' ').trim()}
 G.tags_norm = function(v){return tags_join(tags_split(v))}
 G.tags_union = function(){return tags_join(_.union.apply(_,A(arguments).map(tags_split)))}
-
-//===-------------------------===// ping.html //===------------------------===//
-
-G.A = function(v){return Array.prototype.slice.call(v)}
-G.now = function(){return new Date()/1000}
-
-//===-------------------------===// main.html //===------------------------===//
 
 var hash = function(v){return v.hasOwnProperty('__hash__')? v.__hash__ : (v.__hash__ = Math.random().toString(36).slice(2))}
 var subs = {}
@@ -101,11 +96,13 @@ G.Array.prototype.ζ0_concat = function(){return G.Array.prototype.concat.apply(
 G.Function.prototype.in = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return !time || time<=0? (setImmediate||setTimeout).apply(null,[this].concat(args)) : setTimeout.apply(null,[this,time*1000].concat(args))}
 G.Function.prototype.at = function(time){arguments[0] -= now(); return this.in.apply(this,arguments)}
 G.Function.prototype.every = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return setInterval.apply(null,[this,time*1000].concat(args))}
+G.Array.prototype.zipmap = function(f,ctx){return _.zip.apply(_,this).map(function(v){return f.apply(ctx,v)})}
 G.$.prototype.on_key = function(key,cb0){
+	var t = key.split(/(?=\.\w)/); key = t[0]; var ns = t.slice(1).join('')
 	var t = {'⇥':[9,'↓'],'↩':[13],'⎋':[27,'↑'],'←':[37,'↓'],'↑':[38,'↓'],'→':[39,'↓'],'↓':[40,'↓']}
 	var keyc = t[key]? t[key][0] : (typeof(key)==='number'? key : key.charCodeAt(0))
-	this.on(((t[key]?{'↑':'keyup','↓':'keydown'}[t[key][1]]:0)||'keypress')+(key==='⎋'?'':'.qqq'),function(e){if (e.which===keyc) return cb0(e)}) }
-G.Array.prototype.zipmap = function(f,ctx){return _.zip.apply(_,this).map(function(v){return f.apply(ctx,v)})}
+	this.on(((t[key]?{'↑':'keyup','↓':'keydown'}[t[key][1]]:0)||'keypress')+ns,function(e){if (e.which===keyc) return cb0(e)}) }
+G.$.prototype.find_self = function(sel){return this.find(sel).add(this.filter(sel))}
 
 })(G)
 

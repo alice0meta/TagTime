@@ -23,9 +23,7 @@
 	.tagstr, .tags_in {color:#ffd700;}
 	.time {color:#08f;}
 	em {background-color:#800; margin:0 -0.5ch; padding:0 0.5ch; font-style:normal;}
-</style></head>
-<body><div id='body'></div></body></html>
-<script>
+</style></head><body></body></html><script>
 
 require('./tt_util.js')(window)
 var gui = require('nw.gui')
@@ -33,7 +31,10 @@ var win = gui.Window.get()
 var t = $; var $ = function(v){return t(v,document)}; $.__proto__ = t; $.prototype = t.prototype
 
 win.showf = function(){win.show(); win.focus()}
-$.prototype.focus_end = function(){this.focus(); try {var t = window.document.createRange(); t.selectNodeContents(this[0]); t.collapse(false); var u = window.getSelection(); u.removeAllRanges(); u.addRange(t)} catch (e) {log('nonfatal error',e)}; return this}
+$.prototype.focus_end = function(){var v
+	if ((v=this.find_self('.expando_input')).length) try {v.focus(); var t = window.document.createRange(); t.selectNodeContents(v[0]); t.collapse(false); var u = window.getSelection(); u.removeAllRanges(); u.addRange(t)} catch (e) {clog('nonfatal error',e)}
+	else this.focus()
+	return this}
 
 var future    = function(v){return v.time > now()}
 var late      = function(v){return Math.abs(now()-v.time) > 20}
@@ -43,6 +44,7 @@ var args
 var prev_ping
 var pings = []
 var shown; var done
+var cur
 
 //! this file is a monstrous mess
 //! can we unify ping object tags and element tags?
@@ -96,8 +98,9 @@ var fetch_up = function(cb){if (pings.length>0 && prev_ping===undefined && args.
 //! arrow keys should *not* scroll the scrollbars
 
 // very important:
-//! ditto text should go away when you go down
 //! when to add afk to things?
+//    (all together:)
+//! ditto text should go away when you go down
 //! ditto should not do anything if there is no prev_ping
 //! ditto should pick the previous tags, not the prev_ping
 //! prev_ping needs to update dynamically
@@ -113,81 +116,97 @@ var regenerate = function(cb){if (shown){
 		if (op.tall) {win.setMinimumSize(xw,20); win.setMaximumSize(xw,yb)} else win.setResizable(false)
 		win.moveTo(Math.round((window.screen.width-xw)/2),Math.round((window.screen.height-yw)/2)) }
 
-	if ($('#body').is(':empty')) {
-		if (pings.length > 200 && confirm("oh dear, we're about to try to load "+pings.length+' ping boxes. Quit?'))
-			{alert('Quitting!'); win.close(); cb&&cb(); return}
+	var populate_tags_in = function(){pings.forEach(function(v,i){if (v.tags) $($('.tags_in')[i]).text(v.tags)})}
 
-		if (pings.length===1) {
-			var v = pings[0]
-			$('#body').html([
-				$('<p>').html(["It's tag time! What ",late(v)? $('<em>').text(future(v)?'are':'were') : 'are',' you doing RIGHT ',late(v)?'AT':'NOW',' ',S('time').html(m(v.time*1000).format((very_late(v)?'YYYY-MM-DD/':'')+'HH:mm:ss')),'?']),
-				prev_ping? $('<p>').html([Key("'"),' to repeat previous tags: ',$('<button id="ditto" class="inline tagstr">').text(prev_ping.tags)]) : '',
-				Expando_input('tag_editor','tags_in'),
-			])
+	var c_first = function(){return $('.tag_editor > *').first()}
+	var c_set = function(v){if (v!==cur) {cur&&cur.removeClass('curr_line'); cur = v; cur.addClass('curr_line')}}
+	var c_line = function(){return cur.is($('#submit'))? undefined : cur.find_self('.tags_in')}
+	var c_next = function(){var t; if (cur.is($('#submit'))) c_set(c_first()); else c_set((t=cur.next()).length!==0? t : $('#submit')); c_focus(); return false}
+	var c_prev = function(){var t; if (cur.is($('#submit'))) c_set($('.tag_editor > *').last()); else c_set((t=cur.prev()).length!==0? t : $('#submit')); c_focus(); return false}
+	var c_focus = function(){cur.focus_end()}
+	var c_at_end = function(){return cur.is($('#submit')) || $('#body').hasClass('editor_single')}
 
-			pings.forEach(function(v,i){if (v.tags) $($('.tags_in')[i]).text(v.tags)})
-
-			$('.tags_in').focus_end()
-			$(window).on('click.qqq',function(e){$('.tags_in').focus_end()})
-			$('.tags_in').on('click.qqq',function(e){e.stopPropagation()})
-
-			$('.tags_in').on_key('↩',function(e){if ($('.tags_in').text()!=='') return_and_close(); return false})
-			if (prev_ping) {
-				var ditto = function(){$('.tags_in').text(tags_union($('.tags_in').text(),prev_ping.tags)); return_and_close()}
-				$('#ditto').on('click.qqq',ditto)
-				$(window).on_key("'",function(e){e.preventDefault(); ditto()})
-				}
-			$(window).on_key('⇥',function(e){return false})
-			$(window).on_key('↑',function(e){pings.unshift(prev_ping); prev_ping = undefined; fetch_up(regenerate)})
-
-			size_and_center()
-		} else {
-			$('#body').html([
-				$('<p>').html("It's tag times! What were you doing RIGHT AT these times?"),
-				$('<p>').html([Key("'"),' to repeat previous tags',$('<span id="ditto_o">').html([': ',$('<button id="ditto" class="inline tagstr">')])]),
-				$('<ol class="tag_editor">').html(pings.map(function(v){return $('<li>').html([S('time').html(m(v.time*1000).format('HH:mm:ss')),Expando_input('tags_in_li','tags_in')])})),
-				$('<button id="submit">').text('submit all'),
-			])
-
-			pings.forEach(function(v,i){if (v.tags) $($('.tags_in')[i]).text(v.tags)})
-
-			var c_first = function(){return $('.tag_editor > *').first()}
-			var c_set = function(v){if (v!==cur) {cur&&cur.removeClass('curr_line'); cur = v; cur.addClass('curr_line')}}
-			var c_line = function(){return cur.is($('#submit'))? undefined : cur.find('.tags_in')}
-			var c_next = function(){var t; if (cur.is($('#submit'))) c_set(c_first()); else c_set((t=cur.next()).length!==0? t : $('#submit')); c_focus(); return false}
-			var c_prev = function(){var t; if (cur.is($('#submit'))) c_set($('.tag_editor > *').last()); else c_set((t=cur.prev()).length!==0? t : $('#submit')); c_focus(); return false}
-			var c_focus = function(){if (cur.is($('#submit'))) cur.focus(); else cur.find('.tags_in').focus_end()}
-			var cur; c_set(c_first())
-
-			c_focus()
-			$(window).on('click.qqq',function(e){c_focus()})
-			$('.tags_in').on('click.qqq',function(e){e.stopPropagation(); c_set($(this).closest('li'))})
-
-			$('.tags_in').on_key('↩',c_next)
-			$('.tags_in, #submit').on_key('⇥',c_next)
-			$('.tags_in, #submit').on_key('↓',c_next)
-			$('.tags_in').on_key('↑',function(e){
-				if (cur.is(c_first())) {if (prev_ping) {pings.unshift(prev_ping); prev_ping = undefined; fetch_up(regenerate)}}
-				else c_prev()
-				return false})
-			$('#submit').on_key('↑',c_prev)
-			if (prev_ping) {
-				$('#ditto').text(prev_ping.tags)
-				var ditto = function(){var t; if (t=c_line()) {t.text(tags_union(t.text(),prev_ping.tags)); c_next()}}
-				$('#ditto').on('click.qqq',ditto)
-				$('.tags_in').on_key('\'',function(e){e.preventDefault(); ditto()})
-			} else {
-				$('#ditto_o').hide()
-			}
-			$('#submit').on('click.qqq',function(e){e.stopPropagation(); return_and_close()})
-
-			size_and_center({tall:true})
+	var c_focus_some_always = function(){
+		c_focus()
+		$(window).on('click.editor',function(e){$('.tags_in').focus_end()})
+		$('.tags_in').on('click.editor',function(e){e.stopPropagation(); if ($('#body').hasClass('editor_multi')) c_set($(this).closest('li'))})
 		}
-		cb&&cb()
+
+	var do_ditto = function(){var t; if (t=c_line()) t.text(tags_union(t.text(),prev_ping.tags)); if (c_at_end()) return_and_close(); else c_next()}
+
+	var generate_editor_single = function(cb){
+		var v = pings[0]
+		$('body').html($('<div id="body" class="editor_single">').html([
+			$('<p>').html(["It's tag time! What ",late(v)? $('<em>').text(future(v)?'are':'were') : 'are',' you doing RIGHT ',late(v)?'AT':'NOW',' ',S('time').html(m(v.time*1000).format((very_late(v)?'YYYY-MM-DD/':'')+'HH:mm:ss')),'?']),
+			prev_ping? $('<p>').html([Key("'"),' to repeat previous tags: ',$('<button id="ditto" class="inline tagstr">').text(prev_ping.tags)]) : '',
+			Expando_input('tag_editor','tags_in'),
+		]))
+
+		populate_tags_in()
+		cur = $('.tags_in')
+		c_focus_some_always()
+
+		$('.tags_in').on_key('↩.editor',function(e){if (cur.text()!=='') return_and_close(); return false})
+		$('.tags_in').on_key('⇥.editor',function(e){return false})
+		$('.tags_in').on_key('↑.editor',function(e){if (prev_ping) {pings.unshift(prev_ping); prev_ping = undefined; fetch_up(regenerate)}})
+		if (prev_ping) $('#ditto').on('click.editor',do_ditto)
+		if (prev_ping) $('.tags_in').on_key('\'.editor',function(e){e.preventDefault(); do_ditto()})
+
+		size_and_center()
+		cb&&cb() }
+	var generate_editor_multi = function(cb){
+		if (pings.length > 300 && confirm("oh dear, we're about to try to load "+pings.length+' ping boxes. Quit?'))
+			{alert('Quitting!'); win.close(); return}
+
+		$('body').html($('<div id="body" class="editor_multi">').html([
+			$('<p>').html("It's tag times! What were you doing RIGHT AT these times?"),
+			$('<p>').html([Key("'"),' to repeat previous tags',$('<span id="ditto_o">').html([': ',$('<button id="ditto" class="inline tagstr">')])]),
+			$('<ol class="tag_editor">').html(pings.map(function(v){return $('<li>').html([S('time').html(m(v.time*1000).format('HH:mm:ss')),Expando_input('tags_in_li','tags_in')])})),
+			$('<button id="submit">').text('submit all'),
+		]))
+
+		populate_tags_in()
+		c_set(c_first())
+		c_focus_some_always()
+
+		$('.tags_in').on_key('↩.editor',c_next)
+		$('.tags_in, #submit').on_key('⇥.editor',c_next)
+		$('.tags_in, #submit').on_key('↓.editor',c_next)
+		$('.tags_in').on_key('↑.editor',function(e){
+			if (cur.is(c_first())) {if (prev_ping) {pings.unshift(prev_ping); prev_ping = undefined; fetch_up(regenerate)}}
+			else c_prev()
+			return false})
+		$('#submit').on_key('↑.editor',c_prev)
+		if (prev_ping) {
+			$('#ditto').text(prev_ping.tags)
+			$('#ditto').on('click.editor',do_ditto)
+			$('.tags_in, #submit').on_key('\'.editor',function(e){e.preventDefault(); do_ditto()})
+		} else {
+			$('#ditto_o').hide()
+		}
+		$('#submit').on('click.editor',return_and_close)
+
+		size_and_center({tall:true})
+		cb&&cb() }
+
+	if (pings.length===1) {
+		if (!$('body').hasClass('editor_single')) {
+			$('body').html('')
+			$(window).off('.editor')
+			generate_editor_single(cb)
+		} else {
+			print('oh dear! (single)')
+			cb&&cb()
+		}
 	} else {
-		$('#body').html('')
-		$(window).off('.qqq')
-		regenerate(cb)
+		if (!$('body').hasClass('editor_multi')) {
+			$('body').html('')
+			$(window).off('.editor')
+			generate_editor_multi(cb)
+		} else {
+			print('oh dear! (multi)')
+			cb&&cb()
+		}
 	}
 	}}
 

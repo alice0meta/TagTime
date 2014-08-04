@@ -69,7 +69,7 @@ var beeminder = (function(){
 		var t = path.match(/^(.*?)(\/.*)$/); var host = t[1]; path = t[2]
 		query = seq(query).map(function(v){return encodeURIComponent(v[0])+'='+encodeURIComponent(v[1])}).join('&')
 		path = path+(query===''?'':'?'+query)
-		log('request:',method,host+path)
+		clog('request:',method,host+path)
 		http_.request({host:host,path:path,headers:headers,method:method},function(resp){
 			var t = []; resp.on('data', function(chunk){t.push(chunk)}); resp.on('end', function(){
 				t = t.join('')
@@ -138,7 +138,7 @@ var ping_seq = (function(period){
 //===--===// fns loosely corresponding to the original architecture //===--===//
 
 var start_pings = function(){var t
-	var n; log("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=ping_seq.le(n).time)),'ago, at',m(t*1000).format('HH:mm:ss'))
+	var n; clog("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=ping_seq.le(n).time)),'ago, at',m(t*1000).format('HH:mm:ss'))
 	ping_seq.le(((t=ping_file(rc.p).$[-1])&&t.time) || now()); ping_seq.next() }
 var schedule_pings = function λ(){var ps = ping_seq
 	print('starting again')
@@ -160,7 +160,7 @@ var schedule_pings = function λ(){var ps = ping_seq
 var prompt = function(ping_before,cb){prompt.impl({sound:rc.ping_sound, ping_before:ping_before, macros:rc.macros},cb)}
 
 var tt_sync = function(cb){
-	log('### synchonizing beeminder graphs with local logfile ###')
+	clog('### synchonizing beeminder graphs with local logfile ###')
 	sync_bee(cb)
 	}
 var sync_bee = function(cb){
@@ -247,7 +247,7 @@ var sync_bee = function(cb){
 				}}) }}),
 		10,
 		function(e,action_sets){
-			_.pluck(action_sets,'msgs').ζ0_concat().map(function(v){log(v)})
+			_.pluck(action_sets,'msgs').ζ0_concat().map(function(v){clog(v)})
 			if (!args.dry) async.parallelLimit(_.pluck(action_sets,'cmds').ζ0_concat().map(function(v){return function(cb){beeminder.apply(null,v.concat([cb]))}}),10,cb)
 			else cb&&cb.in()
 		})
@@ -264,7 +264,7 @@ module.exports.main = function(args){
 		case 'merge': merge(argv[1]); break
 		case 'prompt':
 			var t = isNaN(i(argv[1])); var time = t? now() : i(argv[1]); var prev = argv.slice(t?1:2).join(' ')
-			prompt(prev&&function(time,cb){cb({time:time-2000,tags:prev})},function(e,gui){
+			prompt(prev!=='' && function(time,cb){cb({time:time-2000,tags:prev})},function(e,gui){
 				gui.ping({time:time, period:45})
 				// gui.ping({time:time, period:45})
 				gui.show(function(e,pings){print(_.pluck(pings,'tags').join('\n')); if (!e) process.exit()})
