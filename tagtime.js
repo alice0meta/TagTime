@@ -1,9 +1,4 @@
-var util = require('util')
-var exec = require('child_process').exec
-var async = require('async')
-var m = require('moment')
-var minimist = require('minimist')
-var _ = require('underscore')
+require('./tt_util.js')()
 
 // sometime eventually:
 // expand reset_before to make ping_seq faster to start up
@@ -26,99 +21,23 @@ var _ = require('underscore')
 // tray menu! https://gist.github.com/halida/9634676
 // email tagtime? for ios, until we properly deploy to ios?
 // if we make a web request and it doesn't work, we need to not crash
+// it's too easy to let a ping window get lost
+// // ! comments
 
 // todo:
-// //! comments
-// ??sortedness of ping files??
-// bah, fuck, i ate the timezone information again. fix?
-// fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
-// maybe do add the off autotag too
-// btw, we should have a logfile
-// danny's rc.beeminder dsl is observed to only contain tag, (& tags), (| tags), and (! tag)
-// it's actually finally clear how to separate this into different files
-// users really want "only run during certain hours"
+//! ??sortedness of ping files??
+//! bah, fuck, i ate the timezone information again. fix?
+//! fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
+//! maybe do add the off autotag too
+//! btw, we should have a logfile
+//! danny's rc.beeminder dsl is observed to only contain tag, (& tags), (| tags), and (! tag)
+//! it's actually finally clear how to separate this into different files
+//! people who don't use tagtime all the time want "only run during certain hours" and "don't bother logging afk/canceled pings" modes
+//! handle being pinged while you're typing
 
 // most urgent todo:
-// [mendoza] [0.2.0] pings_if(): skips past a lot of multiple-pings-handling logic, but that should be entirely reimplemented from a high level (current afk behavior is undesirable in many ways)
-//     pings_if(): after logging old datapoints, open the ping file in an editor`
-//     okay, so just as is, but if you miss any pings it pops up the editor immediately?
-//     oh, current behavior seems like "ignores any missed pings and logs them"
-//     notes on danny's tagtime workflow: when entering tags, <enter> with no characters will just go straight to the editor. xterm mechanics is just that tagtime calls xterm with appropriate arguments and then is a running program in xterm. and then can optionally call editors and stuff.
-// improve the autoupdater: make it more robust, more convenient, and check for updates more frequently than just every time it runs. and check for local updates.
-// automatically run on startup
-
-//! separation into different files:
-//===----------------------------===// ζ₀ //===----------------------------===//
-	global.fs = require('fs')
-	global.path = require('path')
-	global.moment = require('moment')
-	global._ = require('underscore')
-	var mkdirp = require('mkdirp')
-	String.prototype.repeat = function(v){return new Array(v+1).join(this)}
-	global.pad = function(v,s){return v+s.slice(v.length)}
-	global.argv = {_:process.argv.slice(4)}
-	global.ζ0_def = function(o,m,get,set){Object.defineProperty(o,m,{configurable:true, enumerable:false, get:get, set:set}); return o}
-	Function.prototype.def = function(m,get,set){Object.defineProperty(this.prototype,m,{configurable:true, enumerable:false, get:get, set:set}); return this}
-	;[Array,String].forEach(function(Class){_.range(0,5).forEach(function(i){Class.def('-'+i,function(){return this.length<i? undefined : this[this.length-i]},function(v){return this.length<i? v : this[this.length-i] = v})})})
-	var Path = function Path(path){this._path = path.replace(/^~\//,process.env.HOME+'/')}
-		.def('$',function(){return new PathValue(this._path)},
-			function(v){
-				mkdirp.sync(path.dirname(this._path))
-				if (v instanceof PathValue) fs.createReadStream(v._path).pipe(fs.createWriteStream(this._path))
-				else fs.writeFileSync(this._path,v,{mode:493})
-				})
-		.def('path',function(){return this._path.slice(0,(process.env.HOME+'/').length)===process.env.HOME+'/'? '~'+this._path.slice(process.env.HOME.length) : this._path})
-	var t = function(path){return new Path(path)}; t.__proto__ = fs; global.fs = t
-	function PathValue(path){this._path = path}
-	Path.prototype.realpath = function(){return fs.realpathSync(this._path)}
-	Path.prototype.exists = function(){return fs.existsSync(this._path)}
-	Path.prototype.append = function(v){fs.appendFileSync(this._path,v)}
-	PathValue.prototype.toString = function(){return fs.readFileSync(this._path)+''}
-	PathValue.prototype.split = function(v){return (this+'').split(v)}
-	PathValue.prototype.ζ0_SUB_BYs = function(b){return this.split(b)}
-	global.ζ0_SUB_Fs = function(s,f){return s.split(f).slice(1).join(f)}
-	global.ζ0_SUB_Ts = function(s,t){return s.split(t)[0]}
-	global.ζ0_memb_Emod_obj = function(o,m,f){o[m] = f(o[m]); return o}
-	Array.prototype.ζ0_concat = function(){return Array.prototype.concat.apply([],this)}
-	global.ζ0_int = function(v){return parseInt(v)}
-//===------===// other copypasted (lang-alpha, stopwatch, .html) //===-----===//
-	var merge_o = function(a,b){var r = {}; Object.keys(a).forEach(function(k){r[k] = a[k]}); Object.keys(b).forEach(function(k){r[k] = b[k]}); return r}
-	var seq = function(v){return typeof v === 'string'? v.split('') : v instanceof Array? v : Object.keys(v).map(function(k){return [k,v[k]]})}
-	var frequencies = function(v){return v.reduce(function(r,v){r[v] = v in r? r[v]+1 : 1; return r},{})}
-	function now(){return Date.now() / 1000}
-	String.prototype.repeat = function(v){return v<=0? '' : new Array(v+1).join(this)}
-	var pad = function(v,s,l){while (v.length < l) v = s+v; return v}
-	var format_dur = function λ(v){
-		v = Math.round(v)
-		if (v<0) return '-'+λ(-v)
-		var d = Math.floor(v/60/60/24), h = Math.floor(v/60/60)%24, m = Math.floor(v/60)%60, s = v%60
-		return [d+'d',pad(h+'','0',2)+'h',pad(m+'','0',2)+'m',pad(s+'','0',2)+'s'].slice(d>0?0:h>0?1:m>0?2:3).join('')}
-	Array.prototype.m_concat = function(){return Array.prototype.concat.apply([],this)}
-	var A = function(v){return Array.prototype.slice.call(v)}
-
-//===---------------------------===// util //===---------------------------===//
-
-var i = function(v){return parseInt(v)}
-var is = function(v){return v!==undefined}
-var err = function(v){print.apply(null,['#err#'].concat(arguments)); throw Error(v)}
-var pluralize = function(n,noun){return n+' '+noun+(n==1?'':'s')}
-var bit_reverse_i = function(length,v){var r = 0; for (var i=0;i<length;i++){r = (r << 1) | (v & 1); v = v >> 1}; return r}
-Function.prototype.in = function(time){var args = Array.prototype.slice.call(arguments).slice(1); return !time || time<=0? (setImmediate||setTimeout).apply(null,[this].concat(args)) : setTimeout.apply(null,[this,time*1000].concat(args))}
-Function.prototype.at = function(time){arguments[0] -= now(); return this.in.apply(this,arguments)}
-Function.prototype.every = function(time){var args = Array.prototype.slice.call(arguments).slice(1); return setInterval.apply(null,[this,time*1000].concat(args))}
-var print = function(){var a = A(arguments)
-	process.stdout.write(a.map(function(v){return typeof(v)==='string'? v : util.inspect(v,{colors:true,depth:6})}).join(' ')+'\n')
-	if (typeof(window)!=='undefined') window.__ = a
-	return a[-1]}
-Object.getOwnPropertyNames(Math).forEach(function(v){global[v] = Math[v]})
-_.jclone = function(v){return v===undefined? v : JSON.parse(JSON.stringify(v))}
-
-//===---------------------===// tt-specific util //===---------------------===//
-
-var edit = function(fl){exec(((rc&&rc.editor)||'open -a TextEdit')+" '"+fs(fl).realpath()+"'")}
-
-var tags_split = function(v){return v.trim().split(/ +/)}
-var tags_union = function(a,b){return _.union(tags_split(a),tags_split(b)).join(' ').trim()}
+//! improve the autoupdater: make it more robust, more convenient, and check for updates more frequently than just every time it runs. and check for local updates.
+//! automatically run on startup
 
 //===-------------------===// get args and settings //===------------------===//
 
@@ -129,7 +48,7 @@ var args = minimist(argv._,{alias:{dry:'d',settings:'s'}, default:{settings:'~/.
 if (!fs(args.settings).exists()) {
 	fs(args.settings).$ = (fs('settings.js').$+'').replace(/‹([^›]+)›/g,function(_,v){var t; return is(t=eval(v))?t:''})
 	print("hey, I've put a settings file at",args.settings,"for you. Go fill it in!")
-	edit(args.settings) }
+	exec("open -a TextEdit '"+fs(args.settings).realpath()+"'") }
 
 try {var rc = JSON.parse((fs(args.settings).$+'').replace(/\/\/.*/g,''))}
 catch (e) {print('ERROR: bad rc file:',e); process.exit(1)}
@@ -138,12 +57,6 @@ rc.p = rc.ping_file
 if (!fs(rc.p).exists()) fs(rc.p).$ = ''
 
 rc.ping_sound = rc.ping_sound || 'loud-ding.wav'
-
-//! do discard this if danny's accepted multieditor
-// var macro_replace_all = function(pings){
-// 	var m = typeof(rc.macros)==='string'? JSON.parse(fs(rc.macros).$) : rc.macros
-// 	if (m) pings.forEach(function(v){v.tags = tags_split(v.tags).map(function(v){return m[v]||v}).join(' ')})
-// 	return pings}
 
 //===------------------===// ... auxiliary modules ? //===-----------------===//
 
@@ -156,7 +69,7 @@ var beeminder = (function(){
 		var t = path.match(/^(.*?)(\/.*)$/); var host = t[1]; path = t[2]
 		query = seq(query).map(function(v){return encodeURIComponent(v[0])+'='+encodeURIComponent(v[1])}).join('&')
 		path = path+(query===''?'':'?'+query)
-		//! add log statement here
+		log('request:',method,host+path)
 		http_.request({host:host,path:path,headers:headers,method:method},function(resp){
 			var t = []; resp.on('data', function(chunk){t.push(chunk)}); resp.on('end', function(){
 				t = t.join('')
@@ -196,11 +109,12 @@ var ping_file = (function(){
 	return function(fl){return new r(fl)}})()
 
 var ping_seq = (function(period){
-	var epoch = {seed:666, time:1407043800} // the birth of timepie/tagtime!
-	// var epoch = {seed:666, time:1184083200} // the birth of timepie/tagtime!
+	// var epoch = {seed:666, time:1407043800} // the birth of timepie/tagtime!
+	var epoch = {seed:666, time:1184083200} // the birth of timepie/tagtime!
 	var ping_next = function(ping){ // see p37 of Simulation by Ross
 		ping.seed = pow(7,5)*ping.seed % (pow(2,31)-1) // ran0 from Numerical Recipes
-		ping.time += round(max(1,-45*60*log(ping.seed / (pow(2,31)-1))     /    100   )) } //!
+		// ping.time += round(max(1,-45*60*log(ping.seed / (pow(2,31)-1))     /    100   )) } //!
+		ping.time += round(max(1,-45*60*log(ping.seed / (pow(2,31)-1)))) }
 	var keep = function(v){return !v.fraction || bit_reverse_i(31,v.seed) / (pow(2,31)-1) <= v.fraction}
 	var next_s = function(v){var existing = _.pluck(seqs,'time'); do {ping_next(v)} while (!keep(v)); while (_.contains(existing,v.time)) v.time += 1; return v}
 	
@@ -224,17 +138,16 @@ var ping_seq = (function(period){
 //===--===// fns loosely corresponding to the original architecture //===--===//
 
 var start_pings = function(){var t
-	var n; print("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=ping_seq.le(n).time)),'ago, at',m(t*1000).format('HH:mm:ss'))
-	ping_seq.le(((t=ping_file(rc.p).$[-1])&&t.time) || now()) }
+	var n; log("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=ping_seq.le(n).time)),'ago, at',m(t*1000).format('HH:mm:ss'))
+	ping_seq.le(((t=ping_file(rc.p).$[-1])&&t.time) || now()); ping_seq.next() }
 var schedule_pings = function λ(){var ps = ping_seq
 	print('starting again')
 	var already = []; while (ps[0].time <= now()) {already.push(ps[0]); ps.next()}
-	print('btw nextᵃ:',m(ps[0].time*1000).format('HH:mm:ss'))
 	if (already.length===0) λ.at(ps[0].time)
 	else prompt((function(pfl){return function(time,cb){var t; if (pfl.some(function(v){t=v; return v.time < time})) cb(t); else cb()}})(ping_file(rc.p).$.reverse().slice(0,200)),
 		function(e,gui){
 			already.map(gui.ping)
-			var λt; ;(function λ(){λt = (function(){if (gui.ping(ps[0])) {already.push(ps[0]); ps.next(); print('btw nextᵇ:',m(ps[0].time*1000).format('HH:mm:ss')); λ()}}).at(ps[0].time)})()
+			var λt; ;(function λ(){λt = (function(){if (gui.ping(ps[0])) {already.push(ps[0]); ps.next(); λ()}}).at(ps[0].time)})()
 			gui.show(function(e,pings){
 				clearTimeout(λt)
 				if (pings.length !== already.length) {print('eep! I think you scrolled up!'); pings = pings.slice(pings.length - already.length)} //!
@@ -244,14 +157,10 @@ var schedule_pings = function λ(){var ps = ping_seq
 			})
 		}) }
 
-//! handle being pinged while you're typing
-//! do trim and such the output from ping.html
-//! care about afk vs don't care about afk modes?
-
 var prompt = function(ping_before,cb){prompt.impl({sound:rc.ping_sound, ping_before:ping_before, macros:rc.macros},cb)}
 
 var tt_sync = function(cb){
-	print('### synchonizing beeminder graphs with local logfile ###')
+	log('### synchonizing beeminder graphs with local logfile ###')
 	sync_bee(cb)
 	}
 var sync_bee = function(cb){
@@ -305,13 +214,12 @@ var sync_bee = function(cb){
 				return v.map(function(v){return ['DELETE',{timestamp:v.time,id:v.id}]})
 			else { // log and bee: UPDATE?
 				var t = _.values(_.groupBy(v.filter(function(v){return !(v.add || v.kill)}),'id'))
-				//! v = v.concat(t.slice(1).m_concat().map(function(v){v.kill = true; return {add:true, group_time:v.group_time, period:v.period, tags:v.tags}}))
-				v = v.concat(t.slice(1).m_concat().map(function(v){v.kill = true; return {add:true, tags:v.tags}}))
+				v = v.concat(t.slice(1).ζ0_concat().map(function(v){v.kill = true; return {add:true, group_time:v.group_time, period:v.period, tags:v.tags}}))
 				var set = v.filter(function(v){return !v.kill})
 				var kill = v.filter(function(v){return v.kill})
 				var id = t.length===0? kill[0].id : t[0][0].id
 				return [['UPDATE',id,{timestamp:v[0].group_time, value:set.length*v[0].period/60, comment:pluralize(set.length,'ping')+': '+_.pluck(set,'tags').join(', ')},set.length-kill.length]].concat(kill.filter(function(v){return v.id!==id}).map(function(v){return ['DELETE',{timestamp:v.time,id:v.id}]}))
-			} }).filter(function(v){return v}).m_concat()
+			} }).filter(function(v){return v}).ζ0_concat()
 		actions = _.groupBy(actions,function(v){return v[0]})
 		var CREATE = (actions.CREATE||[]).map(function(v){return v[1]})
 		var UPDATE = (actions.UPDATE||[])
@@ -322,12 +230,12 @@ var sync_bee = function(cb){
 				CREATE.map(function(v){return '+ '+user_slug+' '+ymd(v)+' '+v.comment}),
 				UPDATE.map(function(v){return '= '+user_slug+' '+ymd(v[2])+' '+v[2].comment}),
 				DELETE.map(function(v){return '- '+user_slug+' '+ymd(v)+' '+v.id}),
-				].m_concat(),
+				].ζ0_concat(),
 			cmds: [
 				[[user_slug+'.datapoints ~=',CREATE]],
 				_.sortBy(UPDATE,3).map(function(v){return [user_slug+'.datapoints['+v[1]+'] =',v[2]]}),
 				DELETE.map(function(v){return [user_slug+'.datapoints['+v.id+'] =']}),
-				].m_concat(),
+				].ζ0_concat(),
 			} }
 
 	async.parallelLimit(Object.keys(rc.beeminder).filter(function(v){return v.indexOf('/')!==-1}).map(function(user_slug){return function(cb){
@@ -339,8 +247,8 @@ var sync_bee = function(cb){
 				}}) }}),
 		10,
 		function(e,action_sets){
-			_.pluck(action_sets,'msgs').m_concat().map(function(v){print(v)})
-			if (!args.dry) async.parallelLimit(_.pluck(action_sets,'cmds').m_concat().map(function(v){return function(cb){beeminder.apply(null,v.concat([cb]))}}),10,cb)
+			_.pluck(action_sets,'msgs').ζ0_concat().map(function(v){log(v)})
+			if (!args.dry) async.parallelLimit(_.pluck(action_sets,'cmds').ζ0_concat().map(function(v){return function(cb){beeminder.apply(null,v.concat([cb]))}}),10,cb)
 			else cb&&cb.in()
 		})
 	}
@@ -364,5 +272,3 @@ module.exports.main = function(args){
 			break
 		default: print('usage: ./run.sh (| prompt <time>? <last_doing>? | sync --dry? | merge --dry? <file>) (--settings <file>)?'); break
 	} }
-
-//! process.on('uncaughtException',function(err){window.alert('tagtime is crashing (error code: sit by a lake)'); throw err})
