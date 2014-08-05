@@ -9,6 +9,7 @@ G.util = require('util')
 G.exec = require('child_process').exec
 
 G.async = require('async')
+G.lock = new (require('rwlock'))()
 G.m = require('moment')
 G.minimist = require('minimist')
 G.$ = require('jquery')
@@ -91,17 +92,19 @@ G.sub1 = function(topic,cb){var t = (subs[topic] = subs[topic] || {}); t[hash(cb
 
 var set_prototypes; ;(set_prototypes = function(G){
 
+G.Function.prototype.def = function(m,get,set){Object.defineProperty(this.prototype,m,{configurable:true, enumerable:false, get:get, set:set}); return this}
+;[G.Array,G.String].forEach(function(Class){_.range(0,5).forEach(function(i){Class.def('-'+i,function(){return this.length<i? undefined : this[this.length-i]},function(v){return this.length<i? v : this[this.length-i] = v})})})
 G.String.prototype.repeat = function(v){return new G.Array(v+1).join(this)}
 G.Array.prototype.ζ0_concat = function(){return G.Array.prototype.concat.apply([],this)}
 G.Function.prototype.in = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return !time || time<=0? (setImmediate||setTimeout).apply(null,[this].concat(args)) : setTimeout.apply(null,[this,time*1000].concat(args))}
 G.Function.prototype.at = function(time){arguments[0] -= now(); return this.in.apply(this,arguments)}
 G.Function.prototype.every = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return setInterval.apply(null,[this,time*1000].concat(args))}
 G.Array.prototype.zipmap = function(f,ctx){return _.zip.apply(_,this).map(function(v){return f.apply(ctx,v)})}
-G.$.prototype.on_key = function(key,cb0){
+G.$.prototype.on_key = function(key,sel,cb0){if (!cb0) {cb0 = sel; sel = null}
 	var t = key.split(/(?=\.\w)/); key = t[0]; var ns = t.slice(1).join('')
 	var t = {'⇥':[9,'↓'],'↩':[13],'⎋':[27,'↑'],'←':[37,'↓'],'↑':[38,'↓'],'→':[39,'↓'],'↓':[40,'↓']}
 	var keyc = t[key]? t[key][0] : (typeof(key)==='number'? key : key.charCodeAt(0))
-	this.on(((t[key]?{'↑':'keyup','↓':'keydown'}[t[key][1]]:0)||'keypress')+ns,function(e){if (e.which===keyc) return cb0(e)}) }
+	this.on(((t[key]?{'↑':'keyup','↓':'keydown'}[t[key][1]]:0)||'keypress')+ns,sel,function(e){if (e.which===keyc) return cb0(e)}) }
 G.$.prototype.find_self = function(sel){return this.find(sel).add(this.filter(sel))}
 
 })(G)
