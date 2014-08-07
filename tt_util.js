@@ -100,6 +100,7 @@ G.Function.prototype.in = function(time){var args = G.Array.prototype.slice.call
 G.Function.prototype.at = function(time){arguments[0] -= now(); return this.in.apply(this,arguments)}
 G.Function.prototype.every = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return setInterval.apply(null,[this,time*1000].concat(args))}
 G.Array.prototype.zipmap = function(f,ctx){return _.zip.apply(_,this).map(function(v){return f.apply(ctx,v)})}
+G.$.prototype.textn = function(){return this.text().replace(/\xa0/g,' ')}
 G.$.prototype.on_key = function(key,sel,cb0){if (!cb0) {cb0 = sel; sel = null}
 	var t = key.split(/(?=\.\w)/); key = t[0]; var ns = t.slice(1).join('')
 	var t = {'⇥':[9,'↓'],'↩':[13],'⎋':[27,'↑'],'←':[37,'↓'],'↑':[38,'↓'],'→':[39,'↓'],'↓':[40,'↓']}

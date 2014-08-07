@@ -23,6 +23,7 @@ require('./tt_util.js')()
 // if we make a web request and it doesn't work, we need to not crash
 // it's too easy to let a ping window get lost
 // // ! comments
+// do make sure the tag functions don't chew up (comments)
 
 // todo:
 //! ??sortedness of ping files??
@@ -34,9 +35,12 @@ require('./tt_util.js')()
 //! it's actually finally clear how to separate this into different files
 //! people who don't use tagtime all the time want "only run during certain hours" and "don't bother logging afk/canceled pings" modes
 //! handle being pinged while you're typing
+//! "(@alice, in case this is an easy fix: i drag the tagtime prompt to secondary screen and leave it there. on next ping it jumps to the corresponding place on primary screen. better if it didn't move on you)"
+//! oh dear, it looks like it isn't pinging me for previous pings overnight until the next ping? uh.
 
 // most urgent todo:
 //! improve the autoupdater: make it more robust, more convenient, and check for updates more frequently than just every time it runs. and check for local updates.
+//!     whoops, it doesn't run npm install
 //! automatically run on startup
 
 //===-------------------===// get args and settings //===------------------===//
@@ -109,11 +113,9 @@ var ping_file = (function(){
 	return function(fl){return new r(fl)}})()
 
 var ping_seq = (function(period){
-	// var epoch = {seed:666, time:1407043800} // the birth of timepie/tagtime!
 	var epoch = {seed:666, time:1184083200} // the birth of timepie/tagtime!
 	var ping_next = function(ping){ // see p37 of Simulation by Ross
 		ping.seed = pow(7,5)*ping.seed % (pow(2,31)-1) // ran0 from Numerical Recipes
-		// ping.time += round(max(1,-45*60*log(ping.seed / (pow(2,31)-1))     /    100   )) } //!
 		ping.time += round(max(1,-45*60*log(ping.seed / (pow(2,31)-1)))) }
 	var keep = function(v){return !v.fraction || bit_reverse_i(31,v.seed) / (pow(2,31)-1) <= v.fraction}
 	var next_s = function(v){var existing = _.pluck(seqs,'time'); do {ping_next(v)} while (!keep(v)); while (_.contains(existing,v.time)) v.time += 1; return v}
@@ -140,11 +142,13 @@ var ping_seq = (function(period){
 var start_pings = function(){var t
 	var n; clog("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=ping_seq.le(n).time)),'ago, at',m(t*1000).format('HH:mm:ss'))
 	ping_seq.le(((t=ping_file(rc.p).$[-1])&&t.time) || now()); ping_seq.next() }
-var schedule_pings = function λ(){var ps = ping_seq
+var schedule_pings = function λ(){var t; var ps = ping_seq
 	print('starting again')
 	var already = []; while (ps[0].time <= now()) {already.push(ps[0]); ps.next()}
 	if (already.length===0) λ.at(ps[0].time)
-	else prompt((function(pfl){return function(time,cb){var t; if (pfl.some(function(v){t=v; return v.time < time})) cb(t); else cb()}})(ping_file(rc.p).$.reverse().slice(0,200)),
+	else {
+		clog('creating prompt! for',already.map(function(v){return m(v.time*1000).toISOString()}),'at',m().toISOString())
+		prompt((function(pfl){return function(time,cb){var t; if (pfl.some(function(v){t=v; return v.time < time})) cb(t); else cb()}})(ping_file(rc.p).$.reverse().slice(0,200)),
 		function(e,gui){
 			already.map(gui.ping)
 			var λt; ;(function λ(){λt = (function(){if (gui.ping(ps[0])) {already.push(ps[0]); ps.next(); λ()}}).at(ps[0].time)})()
@@ -155,7 +159,7 @@ var schedule_pings = function λ(){var ps = ping_seq
 				tt_sync()
 				λ()
 			})
-		}) }
+		})} }
 
 var prompt = function(ping_before,cb){prompt.impl({sound:rc.ping_sound, ping_before:ping_before, macros:rc.macros},cb)}
 
