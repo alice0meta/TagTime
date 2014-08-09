@@ -32,7 +32,7 @@ var t = $; var $ = function(v){return t(v,document)}; $.__proto__ = t; $.prototy
 
 win.showf = function(){win.show(); win.focus()}
 $.prototype.focus_end = function(){var v
-	if ((v=this.find_self('.expando_input')).length) try {v.focus(); var t = window.document.createRange(); t.selectNodeContents(v[0]); t.collapse(false); var u = window.getSelection(); u.removeAllRanges(); u.addRange(t)} catch (e) {clog('nonfatal error',e)}
+	if ((v=this.find_self('.expando_input')).length) try {v.focus(); var t = window.document.createRange(); t.selectNodeContents(v[0]); t.collapse(false); var u = window.getSelection(); u.removeAllRanges(); u.addRange(t)} catch (e) {clog('ERROR nonfatal',e)}
 	else this.focus()
 	return this}
 
@@ -83,7 +83,11 @@ var build_window = function(){
 	$(window).mouseenter(win.showf)
 
 	var macros = function λ(){return typeof(args.macros)==='string'? λ._ && λ.stale > now() - 5? λ._ : (λ.stale=now(),λ._=JSON.parse(global.fs(args.macros).$)) : args.macros}
-	if (args.macros) (function(){if (shown && $('.tags_in').length) {var m = macros(); $('.tags_in').map(function(i,v){var t; if ((t=$(v).textn().match(/^(.*?)(\S+) $/)) && $(v).text() !== (t=t[1]+(m[t[2]]||t[2])+'\xa0')) {$(v).text(t); c_focus()}})}}).every(0.2)
+	var m_prev; if (args.macros) (function(){if (shown) {var m = macros()
+		// if (!$('#macros').length) {m_prev=0; $('#body').append($('<table id="macros">')); $.css}
+		// if (!_.isEqual(m_prev,m)) {$('#macros').html(_.pairs(m).map(function(v){return $('<tr>').html([$('<td>').text(v[0]),$('<td>').text(v[1])])})); size_and_center()}
+		$('.tags_in').map(function(i,v){var t; if ((t=$(v).textn().match(/^(.*?)(\S+) $/)) && $(v).text() !== (t=t[1]+(m[t[2]]||t[2])+'\xa0')) {$(v).text(t); c_focus()}})
+		m_prev = m}}).every(0.2)
 	}
 
 // much less important:
@@ -127,15 +131,11 @@ var c_focus_some_always = function(){
 	else $('#tag_editor').on('click','li',function(e){e.stopPropagation(); c_set($(this)); c_focus()})
 	}
 
-var do_ditto = function(e){var t
-	e.preventDefault()
-	if (cur.is(c_first())) {if (prev_ping) {(t=c_line()).text(tags_union(t.textn(),prev_ping.tags)); if (c_at_end()) return_and_close()}}
-	else if (c_at_end()) return_and_close()
-	else {(t=c_line()).text(tags_union(t.textn(),c_get_prev().find_self('.tags_in').textn())); c_next()}
-	}
+var single_ditto = function(e){var t; if (prev_ping&&prev_ping.tags!=='') {e.preventDefault(); (t=c_line()).text(tags_union(t.textn(),prev_ping.tags)); return_and_close()}}
+var multi_ditto = function(e){var t; e.preventDefault(); if (c_at_end()) return_and_close(); else {copy_gui_tags_to_ping_tags(); var prev = [prev_ping].concat(pings)[cur.index()+1-1]; if (prev&&prev.tags!=='') (t=c_line()).text(tags_union(t.textn(),prev.tags)); c_next()}}
 
 var ping_in = function(co,v){var t=Expando_input(co,'tags_in'); t.find('.tags_in').text(v.tags); return t}
-var ping_li = function(v){return $('<li>').html([S('time').html(m(v.time*1000).format('HH:mm:ss')),ping_in('tags_in_li',v)])}
+var ping_li = function(v){return $('<li>').html([S('time').html(moment(v.time).format('HH:mm:ss')),ping_in('tags_in_li',v)])}
 
 var copy_gui_tags_to_ping_tags = function(){ //! remove, maybe just with the unification
 	if ($('.tags_in').length === pings.length) [pings,$('.tags_in').toArray().map(function(v){return $(v).textn()})].zipmap(function(v,tags){v.tags = tags_norm(tags)})
@@ -145,7 +145,7 @@ var copy_gui_tags_to_ping_tags = function(){ //! remove, maybe just with the uni
 var build_single_editor = function(){
 	var v = pings[0]
 	$('body').html($('<div id="body" class="editor_single">').html([
-		$('<p>').html(["It's tag time! What ",late(v)? $('<em>').text(future(v)?'are':'were') : 'are',' you doing RIGHT ',late(v)?'AT':'NOW',' ',S('time').html(m(v.time*1000).format((very_late(v)?'YYYY-MM-DD/':'')+'HH:mm:ss')),'?']),
+		$('<p>').html(["It's tag time! What ",late(v)? $('<em>').text(future(v)?'are':'were') : 'are',' you doing RIGHT ',late(v)?'AT':'NOW',' ',S('time').html(moment(v.time).format((very_late(v)?'YYYY-MM-DD/':'')+'HH:mm:ss')),'?']),
 		$('<p id="ditto_o">').html([Key("'"),' to repeat previous tags: ',$('<button id="ditto" class="inline tagstr">')]),
 		ping_in('#tag_editor',v),
 	]))
@@ -157,8 +157,8 @@ var build_single_editor = function(){
 	$('.tags_in').on_key('⇥',function(){return false})
 	
 	$('.tags_in, #submit').on_key('↑',function(){if (cur.is(c_first())) ping_unshift_if(); else c_prev(); return false})
-	$('#ditto').on('click',do_ditto)
-	$('.tags_in, #submit').on_key('\'',do_ditto)
+	$('#ditto').on('click',single_ditto)
+	$('.tags_in, #submit').on_key('\'',single_ditto)
 	prev_ping_set(prev_ping)
 
 	size_and_center() }
@@ -185,9 +185,9 @@ var build_multi_editor = function(){var t
 
 	$('#tag_editor').on_key('↑','.tags_in',t=function(){if (cur.is(c_first())) ping_unshift_if(c_prev); else c_prev(); return false})
 	$('#submit').on_key('↑',t)
-	$('#ditto').on('click',do_ditto)
-	$('#tag_editor').on_key('\'','.tags_in',do_ditto)
-	$('#submit').on_key('\'',do_ditto)
+	$('#ditto').on('click',multi_ditto)
+	$('#tag_editor').on_key('\'','.tags_in',multi_ditto)
+	$('#submit').on_key('\'',multi_ditto)
 	prev_ping_set(prev_ping)
 
 	size_and_center() }
@@ -207,7 +207,7 @@ var ping_unshift_if = function(cb){lock.readLock('gui',function(rel){
 
 var prev_ping_set = function(v){prev_ping = v; if (shown) {if (v) $('#ditto').text(v.tags); ditto_o_set()}}
 
-var ditto_o_set = function(){prev_ping && cur.is(c_first())? $('#ditto_o').show() : $('#ditto_o').hide()}
+var ditto_o_set = function(){prev_ping&&prev_ping.tags!=='' && cur.is(c_first())? $('#ditto_o').show() : $('#ditto_o').hide()}
 
 var fetch_prev_ping = function(cb){if (prev_ping===undefined && args.ping_before) args.ping_before(pings[0].time,function(ping){if (ping) ping.tags=ping.tags||''; prev_ping_set(ping||null); cb&&cb()}); else cb&&cb()}
 

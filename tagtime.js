@@ -36,7 +36,7 @@ require('./tt_util.js')()
 //! people who don't use tagtime all the time want "only run during certain hours" and "don't bother logging afk/canceled pings" modes
 //! handle being pinged while you're typing
 //! "(@alice, in case this is an easy fix: i drag the tagtime prompt to secondary screen and leave it there. on next ping it jumps to the corresponding place on primary screen. better if it didn't move on you)"
-//! oh dear, it looks like it isn't pinging me for previous pings overnight until the next ping? uh.
+//! OH DEAR wacky crashing bug
 
 // most urgent todo:
 //! improve the autoupdater: make it more robust, more convenient, and check for updates more frequently than just every time it runs. and check for local updates.
@@ -73,7 +73,7 @@ var beeminder = (function(){
 		var t = path.match(/^(.*?)(\/.*)$/); var host = t[1]; path = t[2]
 		query = seq(query).map(function(v){return encodeURIComponent(v[0])+'='+encodeURIComponent(v[1])}).join('&')
 		path = path+(query===''?'':'?'+query)
-		clog('request:',method,host+path)
+		clog('REQUEST',method,host+path)
 		http_.request({host:host,path:path,headers:headers,method:method},function(resp){
 			var t = []; resp.on('data', function(chunk){t.push(chunk)}); resp.on('end', function(){
 				t = t.join('')
@@ -101,10 +101,10 @@ var ping_file = (function(){
 	// log format is: 2014-03-26/19:51:56-07:00‹p22.5›? a b c (a: comment)
 	var dt_fmt = 'YYYY-MM-DD/HH:mm:ssZ'
 	var parse = function(v){
-		if (v.match(/^....-/)) {var t = v.match(/^([^\sp]+)(p\S+)? (.*)$/); return {time:m.utc(t[1],dt_fmt)/1000, period:t[2]? parseFloat(t[2]) : 45, tags:t[3].trim()}}
+		if (v.match(/^....-/)) {var t = v.match(/^([^\sp]+)(p\S+)? (.*)$/); return {time:moment.utc(t[1],dt_fmt)+0, period:t[2]? parseFloat(t[2]) : 45, tags:t[3].trim()}}
 		else {var t = v.match(/^(\d+)([^\[]+)/); if (!t) err('bad log file'); return {time:i(t[1]), period:rc.period, tags:t[2].trim()}}
 		}
-	var stringify = function(v){return m(v.time*1000).format(dt_fmt)+(v.period===45?'':'p'+v.period)+' '+v.tags}
+	var stringify = function(v){return moment(v.time).format(dt_fmt)+(v.period===45?'':'p'+v.period)+' '+v.tags}
 	var read_nonblank_lines = function(fl){return fs(fl).$.split('\n').filter(function(v){return v!==''})}
 	var r = function(fl){this.fl = fl}
 		.def('$',function(){return read_nonblank_lines(this.fl).map(parse)},
@@ -140,14 +140,14 @@ var ping_seq = (function(period){
 //===--===// fns loosely corresponding to the original architecture //===--===//
 
 var start_pings = function(){var t
-	var n; clog("TagTime is watching you! Last ping would've been",format_dur((n=now())-(t=ping_seq.le(n).time)),'ago, at',m(t*1000).format('HH:mm:ss'))
+	var n; clog("BEGIN Last ping would've been",format_dur((n=now())-(t=ping_seq.le(n).time)),'ago, at',moment(t).format('HH:mm:ss'))
 	ping_seq.le(((t=ping_file(rc.p).$[-1])&&t.time) || now()); ping_seq.next() }
 var schedule_pings = function λ(){var t; var ps = ping_seq
 	print('starting again')
 	var already = []; while (ps[0].time <= now()) {already.push(ps[0]); ps.next()}
 	if (already.length===0) λ.at(ps[0].time)
 	else {
-		clog('creating prompt! for',already.map(function(v){return m(v.time*1000).toISOString()}),'at',m().toISOString())
+		clog('PROMPT for',already.map(function(v){return moment(v.time)}).join(' '))
 		prompt((function(pfl){return function(time,cb){var t; if (pfl.some(function(v){t=v; return v.time < time})) cb(t); else cb()}})(ping_file(rc.p).$.reverse().slice(0,200)),
 		function(e,gui){
 			already.map(gui.ping)
@@ -164,7 +164,7 @@ var schedule_pings = function λ(){var t; var ps = ping_seq
 var prompt = function(ping_before,cb){prompt.impl({sound:rc.ping_sound, ping_before:ping_before, macros:rc.macros},cb)}
 
 var tt_sync = function(cb){
-	clog('### synchonizing beeminder graphs with local logfile ###')
+	clog('SYNC (beeminder graphs with local logfile)')
 	sync_bee(cb)
 	}
 var sync_bee = function(cb){
@@ -228,12 +228,12 @@ var sync_bee = function(cb){
 		var CREATE = (actions.CREATE||[]).map(function(v){return v[1]})
 		var UPDATE = (actions.UPDATE||[])
 		var DELETE = _.uniq((actions.DELETE||[]).map(function(v){return v[1]}),function(v){return v.id})
-		var ymd = function(v){return m.utc(v.timestamp*1000).format('YYYY-MM-DD')}
+		var ymd = function(v){return moment.utc(v.timestamp).format('YYYY-MM-DD')}
 		return {
 			msgs: [
-				CREATE.map(function(v){return '+ '+user_slug+' '+ymd(v)+' '+v.comment}),
-				UPDATE.map(function(v){return '= '+user_slug+' '+ymd(v[2])+' '+v[2].comment}),
-				DELETE.map(function(v){return '- '+user_slug+' '+ymd(v)+' '+v.id}),
+				CREATE.map(function(v){return 'BEE_SYNC + '+user_slug+' '+ymd(v)+' '+v.comment}),
+				UPDATE.map(function(v){return 'BEE_SYNC = '+user_slug+' '+ymd(v[2])+' '+v[2].comment}),
+				DELETE.map(function(v){return 'BEE_SYNC - '+user_slug+' '+ymd(v)+' '+v.id}),
 				].ζ0_concat(),
 			cmds: [
 				[[user_slug+'.datapoints ~=',CREATE]],
@@ -268,7 +268,7 @@ module.exports.main = function(args){
 		case 'merge': merge(argv[1]); break
 		case 'prompt':
 			var t = isNaN(i(argv[1])); var time = t? now() : i(argv[1]); var prev = argv.slice(t?1:2).join(' ')
-			prompt(prev!=='' && function(time,cb){cb({time:time-2000,tags:prev})},function(e,gui){
+			prompt(function(time,cb){cb({time:time-2000,tags:prev}); if (prev) prev = prev.slice(0,-1)+String.fromCharCode(prev[-1].charCodeAt(0)+1)},function(e,gui){
 				gui.ping({time:time, period:45})
 				// gui.ping({time:time, period:45})
 				gui.show(function(e,pings){print(_.pluck(pings,'tags').join('\n')); if (!e) process.exit()})
