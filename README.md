@@ -6,7 +6,7 @@ If you're not using OSX, try [TagTime v0](https://github.com/alice0meta/TagTime/
 
 ## Installation and Quick Start
 
-1. Run `eval "$(curl -fsSL https://raw.github.com/alice0meta/TagTime/master/install.sh)"` in a terminal.
+1. Run `eval "$(curl -fsSL https://raw.githubusercontent.com/alice0meta/TagTime/master/install.sh)"` in a terminal.
 1. Answer the pings! (Always answer with what it caught you at right at that moment)
 1. Run `tagtime` in a terminal each time after you reboot your machine.
 
