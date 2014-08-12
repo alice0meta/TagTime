@@ -41,7 +41,6 @@ distribute just the .nw file. allow local builds but do it in a similar way to g
 //! maybe do add the off autotag too
 //! btw, we should have a logfile
 //! danny's rc.beeminder dsl is observed to only contain tag, (& tags), (| tags), and (! tag)
-//! it's actually finally clear how to separate this into different files
 //! people who don't use tagtime all the time want "only run during certain hours" and "don't bother logging afk/canceled pings" modes
 //! handle being pinged while you're typing
 //! "(@alice, in case this is an easy fix: i drag the tagtime prompt to secondary screen and leave it there. on next ping it jumps to the corresponding place on primary screen. better if it didn't move on you)"
