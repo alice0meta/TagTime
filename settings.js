@@ -1,8 +1,7 @@
-‹// These aren't the droids you're looking for! The settings file to edit will be automatically generated as ~/.tagtime.json
-›// Settings for TagTime. Edit me if you want to send pings to Beeminder graphs!
+// Settings for TagTime. Edit me if you want to send pings to Beeminder graphs!
 {
 	"period": 45, // average number of minutes between pings
-	"ping_file": ‹'"~/'+process.env.HOME.replace(/^\/Users\//,'')+'.log"'›,
+	"ping_file": ‹'"~/TagTime/'+process.env.HOME.replace(/^\/Users\//,'')+'.log"'›,
 	"beeminder": {
 		// get your auth token from https://www.beeminder.com/api/v1/auth_token.json
 		"auth": "xxxxxxxxxxxxxxxxxxxx",

@@ -1,9 +1,38 @@
+
+
+
+
+
+
+
+
+
+
+var prompt = function(ping_before,cb){prompt.impl({sound:rc.ping_sound, ping_before:ping_before, macros:rc.macros},cb)}
+prompt:function(args,cb){
+	sub1('ping_prompt',function(v){
+		v.init(args)
+		var t = v.show; v.show = function(cb){t(function(e,v){win.setShowInTaskbar(false); cb(e,v)})}
+		cb(null,v)})
+	gui.Window.open('ping.html',{frame:false, 'always-on-top':true, min_width:50, min_height:20, show:false})
+	win.setShowInTaskbar(true)
+	}
+
+use 'inject-js-end':'filename' option?
+
+
+
+
+
+
+
+
 <!DOCTYPE html>
 <html><head>
 	<meta charset="utf-8">
 <style>
 	/* behavior */
-	body {margin:8px;  white-space:nowrap;}
+	body {margin:8px; white-space:nowrap;}
 	body {-webkit-app-region:drag;} .expando_input, button {-webkit-app-region:no-drag;}
 	#body {display:inline-block;}
 	

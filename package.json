@@ -1,14 +1,13 @@
 {
   "name": "tagtime",
   "description": "desktop tagtime",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/alice0meta/TagTime.git"
   },
   "dependencies": {
     "async": "^0.9.0",
-    "cmp-version": "*",
     "jquery": "^2.1.1",
     "minimist": "^0.2.0",
     "mkdirp": "^0.5.0",
@@ -16,9 +15,11 @@
     "rwlock": "^4.0.0",
     "underscore": "^1.6.0"
   },
-  "main": "main.html",
+  "main": "blank.html",
+  "node-main": "nw_main.js",
   "window": {
     "show": false,
     "show_in_taskbar": false
-  }
+  },
+  "single-instance": false
 }

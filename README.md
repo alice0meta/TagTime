@@ -6,9 +6,9 @@ If you're not using OSX, try [TagTime v0](https://github.com/alice0meta/TagTime/
 
 ## Installation and Quick Start
 
-1. Run `cd ~; git clone https://github.com/alice0meta/TagTime.git; TagTime/run.sh` in a terminal.
+1. Run `eval "$(curl -fsSL https://raw.github.com/alice0meta/TagTime/master/install.sh)"` in a terminal.
 1. Answer the pings! (Always answer with what it caught you at right at that moment)
-1. Run `~/TagTime/run.sh` in a terminal again each time after you reboot your machine, or to check for updates.
+1. Run `tagtime` in a terminal each time after you reboot your machine.
 
 ## The Math
 
@@ -21,8 +21,8 @@ The probability of waiting over 10 hours for a ping is one in a million.
 
 ## Beeminder Integration
 
-To set up TagTime to automatically send reports to [Beeminder](http://www.beeminder.com/), first set up a goal there. Copy the `username/slug` and plug it into your `~/.tagtime.js` file.
-Each goal on Beeminder will track a collection of one or more tags on TagTime. See `~/.tagtime.js` for more details.
+To set up TagTime to automatically send reports to [Beeminder](http://www.beeminder.com/), first set up a goal there. Copy the `username/slug` and plug it into your `~/TagTime/settings.json` file.
+Each goal on Beeminder will track a collection of one or more tags on TagTime. See `~/TagTime/settings.json` for more details.
 
 ## Android App
 

@@ -1,3 +1,11 @@
+
+
+
+
+
+
+
+
 var G = global
 var G_keys = Object.keys(G)
 
@@ -62,12 +70,14 @@ G.format_dur = function λ(v){
 
 //===---------------------------===// util //===---------------------------===//
 
+G.lazy = function(o,m,f){ζ0_def(o,m,function(){delete(o[m]); return o[m] = f()},function(v){delete(o[m]); return o[m] = v})}
+
 G.i = function(v){return parseInt(v)}
 G.is = function(v){return v!==undefined}
-G.err = function(v){print.apply(null,['#err#'].concat(arguments)); throw Error(v)}
+G.err = function(v){print.apply(null,['#err#'].concat(A(arguments))); throw Error(v)}
 G.pluralize = function(n,noun){return n+' '+noun+(n==1?'':'s')}
 G.bit_reverse_i = function(length,v){var r = 0; for (var i=0;i<length;i++){r = (r << 1) | (v & 1); v = v >> 1}; return r}
-Object.getOwnPropertyNames(Math).forEach(function(v){global[v] = Math[v]})
+Object.getOwnPropertyNames(Math).forEach(function(v){G[v] = Math[v]})
 _.jclone = function(v){return v===undefined? v : JSON.parse(JSON.stringify(v))}
 var sprint = function(v,opt){return v.map(function(v){return typeof(v)==='string'? v : util.inspect(v,opt)}).join(' ')}
 G.A = function(v){return Array.prototype.slice.call(v)}
@@ -84,20 +94,6 @@ var t = G.moment; G.moment = function(i){return typeof(i)==='number' && argument
 G.moment.fn.valueOf = function(){return +this._d/1000 + (this._offset||0)*60}
 G.moment.fn.toString = function(){return this.utc().format('YYYY-MM-DD[T]HH:mm:ss[Z]')}
 G.moment.fn.inspect = function(){return '\x1b[35m'+this.toString()+'\x1b[39m'}
-
-//===---------------------===// tt-specific util //===---------------------===//
-
-G.clog = function(){return print.apply(null,[moment()].concat(A(arguments)))}
-
-G.tags_split = function(v){return v.trim().split(/ +/)}
-G.tags_join = function(v){return v.join(' ').trim()}
-G.tags_norm = function(v){return tags_join(tags_split(v))}
-G.tags_union = function(){return tags_join(_.union.apply(_,A(arguments).map(tags_split)))}
-
-var hash = function(v){return v.hasOwnProperty('__hash__')? v.__hash__ : (v.__hash__ = Math.random().toString(36).slice(2))}
-var subs = {}
-G.pub = function(topic,v){subs[topic] && _.values(subs[topic]).forEach(function(sub){sub(v)})}
-G.sub1 = function(topic,cb){var t = (subs[topic] = subs[topic] || {}); t[hash(cb)] = function(v){delete(t[hash(cb)]); cb(v)}}
 
 //===------------------------===// .prototype. //===-----------------------===//
 

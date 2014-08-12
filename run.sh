@@ -1,52 +1,22 @@
 #!/usr/bin/env bash
 cd $(dirname "${BASH_SOURCE[0]}")
-PATH="/usr/local/bin:$PATH:.:./node_modules/.bin"
-
-mk() { cat >"$1"; chmod -R 755 "$1" &>/dev/null; }
-run_except() { ( "${@:2}" 3>&1 1>&2 2>&3 | grep -v "$1" ) 3>&1 1>&2 2>&3; }
 
 stop() { t=$(pgrep -f 'webkit.*tagtime'); if [ "$t" ]; then echo "killing existing tagtime process $t"; kill "$t"; fi; }
 
-gen_tt_nw() { zip -FSrq bin/tagtime.nw $(for v in *; do if [ -f "$v" ]; then echo $v; fi; done) node_modules; }
+#//! command line json parser
+alias ttnw='node-webkit-v0.10.0.app/Contents/MacOS/node-webkit tagtime.nw'
 
-tt() {
-	if [ -f "./node_modules/.bin/cmp-version" ]; then
-		ver="$(cmp-version)"
-		if [ "$ver" != "" ]; then
-			echo "updating: $ver"
-			git pull -q
-			if [ -f "update.sh" ]; then update.sh; exit 0; fi
-		fi
-	fi
+ensure_node() { type node &>/dev/null || {
+	type brew &>/dev/null || { ruby -e "$(curl -fsSL https://raw.github.com/Homebrew/homebrew/go/install)"; }
+	brew install node; }; }
 
-	mkdir bin &>/dev/null
-
-	if [ ! -d bin/node-webkit.app ]; then
-		nw_root="http://dl.node-webkit.org/v0.10.0/"
-		nw_name="node-webkit-v0.10.0-osx-ia32"
-		curl --compressed -O "$nw_root$nw_name.zip"
-		unzip -q "$nw_name.zip"
-		mv "$nw_name/node-webkit.app/" bin
-		rm "$nw_name.zip"
-		rm -r "$nw_name"
-	fi
-
-	# if [ ! -f bin/tagtime.nw ]; then
-		if [ ! -d node_modules ]; then
-			type node &>/dev/null || {
-				type brew &>/dev/null || { ruby -e "$(curl -fsSL https://raw.github.com/Homebrew/homebrew/go/install)"; }
-				brew install node
-			}
-			npm install >/dev/null
-		fi
-		gen_tt_nw
-	# fi
-
-	stop
-	(run_except 'dns_config_service_posix.cc.*Failed to read DnsConfig.' bin/node-webkit.app/Contents/MacOS/node-webkit bin/tagtime.nw "$@" &)
-}
+#//! command line json parser
+# if [ -d ~/ali/github/TagTime ] grab latest
 
 case "$1" in
 	stop) stop;;
-	*) tt "$@";;
+	sync) shift; ensure_node; sync.js "$@";;
+	prompt) ttnw "$@";;
+	*)	if [[ $@ ]]; then echo 'usage: TagTime (| sync --dry? | stop | prompt <time>? <last tags>?)'
+		else stop; (ttnw daemon &); fi;;
 esac
