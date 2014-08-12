@@ -4,7 +4,7 @@ cd $(dirname "${BASH_SOURCE[0]}")
 stop() { t=$(pgrep -f 'webkit.*tagtime'); [[ "$t" ]] && { echo "killing existing tagtime process $t"; kill "$t"; } }
 
 #//! command line json parser
-alias ttnw='node-webkit-v0.10.0.app/Contents/MacOS/node-webkit tagtime.nw'
+ttnw() { node-webkit-v0.10.0.app/Contents/MacOS/node-webkit tagtime.nw "$@"; }
 
 ensure_node() { type node &>/dev/null || {
 	type brew &>/dev/null || { ruby -e "$(curl -fsSL https://raw.github.com/Homebrew/homebrew/go/install)"; }
@@ -19,3 +19,5 @@ case "$1" in
 	*)	if [[ $@ ]]; then echo 'usage: tagtime (| sync --dry? | stop | prompt <time>? <last tags>?)'
 		else stop; (ttnw daemon &); fi;;
 esac
+
+cd ~-
