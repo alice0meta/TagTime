@@ -5,15 +5,15 @@ var sync = require('./sync.js')
 var prompt = function(cb){gui.Window.open('prompt.html',{frame:false, show:false, 'always-on-top':true}).init_cb = cb}
 
 var schedule_pings = function(){var t
-	var n; clog("BEGIN last pingtime was",format_dur((n=now())-(t=ping_seq.le(n).time)),'ago, at',moment(t).format('HH:mm:ss'))
+	var n; clog('BEGIN last ping was',moment(t=ping_seq.le(n=now()).time),'(',format_dur(n-t),'ago )')
 	ping_seq.le(((t=ping_file(rc.ping_file).$[-1])&&t.time) || now()); ping_seq.next()
 	;(function λ(){var t; var ps = ping_seq
 		var already = []; while (ps[0].time <= now()) {already.push(ps[0]); ps.next()}
-		if (already.length===0) {clog('WAITING till',moment(ps[0].time-12345),'+',12345); λ.at(ps[0].time)}
+		if (already.length===0) {clog('WAITING till',ps[0].time); λ.at(ps[0].time)}
 		else {
 			clog('PROMPT for',already.map(function(v){return moment(v.time)}))
 			prompt(function(e,gui){
-				var pfl = ping_file(rc.ping_file).$.slice(-200); gui.ping_before(function(time,cb){if (pfl[-1].time < time) cb(pfl.pop()); else cb()})
+				var pfl = ping_file(rc.ping_file).$.slice(-200); gui.ping_before(function(time,cb){if (pfl[-1]&&pfl[-1].time < time) cb(pfl.pop()); else cb()})
 				already.map(gui.ping)
 				var λt; ;(function λ(){λt = (function(){if (gui.ping(ps[0])) {already.push(ps[0]); ps.next(); λ()}}).at(ps[0].time)})()
 				gui.show(function(e,pings){
