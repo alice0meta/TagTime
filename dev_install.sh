@@ -8,12 +8,12 @@ if [ ! -d dl ]; then cdmk dl/TagTime; git clone -b dl --single-branch https://gi
 mkdir -p .git/hooks &>/dev/null
 mk .git/hooks/pre-commit <<'EOL'
 #!/usr/bin/env bash
-[[ $(diff package.json dl/TagTime/package.json) ]] && {
+[[ $(diff package.json dl/TagTime/package.json) ]] && ( {
 	./build.sh dl/TagTime/tagtime-latest-osx.tar.gz &&
 	cp package.json dl/TagTime &&
 	cd dl/TagTime &&
 	git commit -a -m "automated" &&
 	git push
 	cd ~-
-}
+} &)
 EOL
