@@ -9,7 +9,7 @@ we are avoiding binary packages so that we don't have to bother with nw-gyp or b
 // consider switching to https://github.com/atom/atom-shell
 
 // roadmapy:
-// we want to deploy to windows, osx, linux, webapp, android, and ios
+// we want to deploy to windows, ✓ osx, linux, webapp, android, and ios
 
 // todo back:
 // have read_graph cache its results
@@ -20,28 +20,28 @@ we are avoiding binary packages so that we don't have to bother with nw-gyp or b
 // consider reenabling seed: 666, // for pings not in sync with other peoples' pings, change this
 // "an installer for node-webkit" https://github.com/shama/nodewebkit
 // maybe prepare the gui beforehand so that we can make it come up on exactly the right instant?
-// maybe separate the processes *again* to get rid of that blur bug
+// maybe separate the processes *again* to get rid of that window.blur bug
 // tray menu! https://gist.github.com/halida/9634676
 // email tagtime? for ios, until we properly deploy to ios?
 // if we make a web request and it doesn't work, we need to not crash
 // it's too easy to let a ping window get lost
 // // ! comments
 // do make sure the tag functions don't chew up (comments)
+// a future "advanced settings" thing maybe. like "keep my system clock mercilessly in sync with ntp.org" or whatever - /usr/sbin/ntpdate pool.ntp.org
+// "(@alice, in case this is an easy fix: i drag the tagtime prompt to secondary screen and leave it there. on next ping it jumps to the corresponding place on primary screen. better if it didn't move on you)"
+// fix up the readme
+// oh dear, ζtt is _not_ very window-sanitary. dependency: work on ζ₀
 
 // todo:
 //! automatically run on startup
 //! ??sortedness of ping files??
 //! bah, fuck, i ate the timezone information again. fix?
 //! fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
-//! maybe do add the off autotag too
 //! btw, we should have a logfile. and maybe make it work for everything (install script, etc) not just the clogs?
-//! danny's rc.beeminder dsl is observed to only contain tag, (& tags), (| tags), and (! tag)
 //! people who don't use tagtime all the time want "only run during certain hours" and "don't bother logging afk/canceled pings" modes
 //! handle being pinged while you're typing
-//! "(@alice, in case this is an easy fix: i drag the tagtime prompt to secondary screen and leave it there. on next ping it jumps to the corresponding place on primary screen. better if it didn't move on you)"
 //! OH DEAR wacky crashing bug
 //!    i think it should be super explicit like "your computer seems to be bogged down". usually that will have been painfully obvious to you which is actually reassuring for tagtime to notice and warn you and tell you exactly why. and if it ever happens for no apparent reason then it would probably be good to get a bug report about that - how about "This ping is $x seconds late! If this doesn't seem like your computer's fault you can _submit a bug report_ [link]." link code: gui.Shell.openExternal('https://github.com/rogerwang/node-webkit')
-//! have ditto get the most recent line that contains any text
 
 ah.
 2014-08-12T01:12:28Z PROMPT for [ 2014-08-11T18:53:46Z,
@@ -59,17 +59,6 @@ ah.
   2014-08-12T01:02:09Z ]
 
 //===---------------------===// pile from a padm //===---------------------===//
-
-> This is not a big deal in general, but just nice to comply with free desktop
-> standard:
-> http://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html
-
-Other ideas around standards:
-
-- automatic startup of tagtimed.pl on session start, as in http://standards.freedesktop.org/autostart-spec/autostart-spec-0.5.html
-
-Synchronize your system clock to some official source:
-  sudo /usr/sbin/ntpdate pool.ntp.org
 
 Ideas for using TagTime:
 * Googlers who want to make sure they're getting in their 20% time. 
@@ -95,6 +84,8 @@ Ideas for further development of TagTime:
 Convention: When introducing a new tag, define it with a parenthetical in your response to the ping the first time you use it.  Eg, if you decide to create a new tag "mtg" for time spent in meetings then answer the first such ping with something like "job nyc mtg (mtg: in a meeting)".
 
 Ideas for auto-tags (ie, tags the computer can figure out on its own):
+0a. afk -- ???
+0b. off -- tagtime wasn't running (so your computer was probably offline)
 1. home, work, etc -- gleaned from wireless SSID
 2. mouse -- if an external mouse is plugged in
 3. monitor -- if an external monitor is plugged in

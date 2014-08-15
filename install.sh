@@ -8,7 +8,7 @@ fetch_nw_app() { t="node-webkit-$1"; [ -d "$t.app" ] || {
 	mv "$t-$2/node-webkit.app/" "$t.app" && rm -r "$t-$2"
 	} }
 
-echo '~ installing tagtime ~'
+[ -d /usr/local/tagtime ] || echo '~ installing tagtime ~'
 cdmk /usr/local/tagtime
 t="$(find. ! -name 'node-webkit-*.app')"; [[ "$t" ]] && rm -r $t
 fetch_nw_app v0.10.0 osx-ia32

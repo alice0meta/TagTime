@@ -1,8 +1,6 @@
 var G = global
 var G_keys = Object.keys(G)
 
-//! oh dear, this is _not_ very window-sanitary
-
 //===-------------------------===// requires //===-------------------------===//
 
 G.util = require('util')
@@ -74,8 +72,7 @@ Object.getOwnPropertyNames(Math).forEach(function(v){G[v] = Math[v]})
 _.jclone = function(v){return v===undefined? v : JSON.parse(JSON.stringify(v))}
 var sprint = function(v,opt){return v.map(function(v){return typeof(v)==='string'? v : util.inspect(v,opt)}).join(' ')}
 G.A = function(v){return Array.prototype.slice.call(v)}
-G.print = function(){var a = A(arguments); process.stdout.write(sprint(a,{colors:true,depth:2})+'\n'); if (typeof(window)!=='undefined') window.__ = a; return a[-1]}
-G.$.prototype.textn = function(){return this.text().replace(/\xa0/g,' ')}
+G.print = function(){var a = A(arguments); process.stdout.write(sprint(a,{colors:true,depth:2})+'\n'); return a[-1]}
 G.$.prototype.on_key = function(key,sel,cb0){if (!cb0) {cb0 = sel; sel = null}
 	var t = key.split(/(?=\.\w)/); key = t[0]; var ns = t.slice(1).join('')
 	var t = {'⇥':[9,'↓'],'↩':[13],'⎋':[27,'↑'],'←':[37,'↓'],'↑':[38,'↓'],'→':[39,'↓'],'↓':[40,'↓']}
@@ -83,7 +80,7 @@ G.$.prototype.on_key = function(key,sel,cb0){if (!cb0) {cb0 = sel; sel = null}
 	this.on(((t[key]?{'↑':'keyup','↓':'keydown'}[t[key][1]]:0)||'keypress')+ns,sel,function(e){if (e.which===keyc) return cb0(e)}) }
 G.$.prototype.find_self = function(sel){return this.find(sel).add(this.filter(sel))}
 
-var t = G.moment; G.moment = function(i){return typeof(i)==='number' && arguments.length===1? t(i*1000) : t.apply(this,arguments)}; G.moment.__proto__ = t
+var t = moment; G.moment = function(i){return typeof(i)==='number' && arguments.length===1? t(i*1000) : t.apply(this,arguments)}; moment.__proto__ = t
 G.moment.fn.valueOf = function(){return +this._d/1000 + (this._offset||0)*60}
 G.moment.fn.toString = function(){return this.utc().format('YYYY-MM-DD[T]HH:mm:ss[Z]')}
 G.moment.fn.inspect = function(){return '\x1b[35m'+this.toString()+'\x1b[39m'}
@@ -94,6 +91,7 @@ var set_prototypes; ;(set_prototypes = function(G){
 
 G.Function.prototype.def = function(m,get,set){Object.defineProperty(this.prototype,m,{configurable:true, enumerable:false, get:get, set:set}); return this}
 ;[G.Array,G.String].forEach(function(Class){_.range(0,5).forEach(function(i){Class.def('-'+i,function(){return this.length<i? undefined : this[this.length-i]},function(v){return this.length<i? v : this[this.length-i] = v})})})
+G.Array.prototype.find = function(f,ctx){return _.find(this,f,ctx)}
 G.String.prototype.repeat = function(v){return new G.Array(v+1).join(this)}
 G.Array.prototype.ζ0_concat = function(){return G.Array.prototype.concat.apply([],this)}
 G.Function.prototype.in = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return !time || time<=0? (setImmediate||setTimeout).apply(null,[this].concat(args)) : setTimeout.apply(null,[this,time*1000].concat(args))}

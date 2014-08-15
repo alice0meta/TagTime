@@ -12,16 +12,10 @@ var beeminder_pings = function(datapoints){return _.flatten(datapoints.filter(fu
 	r.map(function(v){v.group = r})
 	return r}),true) }
 
-var tagdsl_eval = function(f,tags){
-	f = f.split(' ')
-	var check = function(v){return tags.replace(/\(.*?\)/g,' ').trim().split(/ +/).some(function(t){return t===v})}
-	var first_next = function(f){return f[0]==='¬'||f[0]==='!'? [!check(f[1]),f.slice(2)] : [check(f[0]), f.slice(1)]}
-	var v = first_next(f); while (true) {
-		if (v[1].length===0) return v[0]
-		else if (v[1][0].toLowerCase()==='&') {var t = first_next(v[1].slice(1)); v = [v[0]&&t[0],t[1]]}
-		else if (v[1][0].toLowerCase()==='|') {var t = first_next(v[1].slice(1)); v = [v[0]||t[0],t[1]]}
-		else {print('oh no, bad tag dsl!',f); throw 'BAD_TAG_DSL'}
-		} }
+var tagdsl_eval = function(f,tags){var t
+	tags = tags.replace(/\(.*?\)/g,' ').trim().split(/ +/)
+	var check = function(v){return _.contains(tags,v)}
+	return f instanceof Array? f.every(check) : f.slice(0,2)==='! '? !check(f.slice(2)) : f.split(' ').some(check) }
 
 var generate_actions = function(user_slug,f_pings,b_pings){var t
 	f_pings = _.sortBy(f_pings,'time') //! maybe don't need to sort these two?
@@ -29,9 +23,6 @@ var generate_actions = function(user_slug,f_pings,b_pings){var t
 	f_pings.map(function(v){v.group_time = round(v.time/86400 - 2/3)*86400 + 86400*2/3})
 	b_pings.map(function(v){v.group_time = round(v.time/86400 - 2/3)*86400 + 86400*2/3})
 	if (b_pings.some(function(v){return v.group_time!==v.time})) {print('ERROR: so confused'); throw '‽'}
-
-	var do_group = typeof(t=rc.beeminder.grouping)==='string'? _.contains(t.split(' '),user_slug) : t
-	if (!do_group) {print('ERROR: oh sorry, non-grouped upload isn\'t implemented yet'); throw 'IMPL_IS_LAME'}
 
 	//! horrifyingly inefficient
 	f_pings.map(function(fp){

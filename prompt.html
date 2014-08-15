@@ -5,13 +5,9 @@ var clog = global.clog
 var gui = require('nw.gui')
 
 var win = gui.Window.get()
-var t = $; var $ = function(v){return t(v,document)}; $.__proto__ = t; $.prototype = t.prototype
+var jquery = $; var $ = function(v){return jquery(v,document)}; $.__proto__ = jquery; $.prototype = jquery.prototype
 
 win.showf = function(){win.show(); win.focus()}
-$.prototype.focus_end = function(){var v
-	if ((v=this.find_self('.expando_input')).length) try {v.focus(); var t = window.document.createRange(); t.selectNodeContents(v[0]); t.collapse(false); var u = window.getSelection(); u.removeAllRanges(); u.addRange(t)} catch (e) {clog('ERROR nonfatal',e)}
-	else this.focus()
-	return this}
 $.css = function(v){$('head').append('<style>'+v+'</style>')}
 var menu = function(args,v){var r = args? new gui.Menu(args) : new gui.Menu(); v.forEach(function(v){
 	var t = {label:v[0].replace(/\$([\w_]+)/g,function(_,v){return nwDispatcher.getNSStringWithFixup('IDS_'+v+'_MAC')})}
@@ -30,26 +26,27 @@ var pings = []
 var shown; var done
 var cur
 
-//! this file is a monstrous mess
-//! can we unify ping object tags and element tags?
+//! this file is a (less) monstrous mess
 
 $.css(
 	// behavior
 	'body {margin:8px; white-space:nowrap;}'+
-	'body {-webkit-app-region:drag;} .expando_input, button {-webkit-app-region:no-drag;}'+
+	'body {-webkit-app-region:drag;} input, button {-webkit-app-region:no-drag;}'+
 	'#body {display:inline-block;}'+
 
-	// element defn
-	'.expando_input {display:table-cell;}'+
-
-	// style
+	// general style
 	'* {outline:none;}'+
-	'body {background-color:#222; color:#fff; font-family:Monaco,monospace; font-size:12px;}'+
 	'p {margin:0;}'+
-	'button {background-color:#333; border:1px solid #666; cursor:pointer; padding:2px 4px; color:inherit; font:inherit;}'+
+	'button, input {color:inherit; font:inherit; background-color:inherit;}'+
+	'input {margin:0; padding:0; border:none;}'+
+	
+	// specific style
+	'body {background-color:#222; color:#fff; font-family:Monaco,monospace; font-size:12px;}'+
+	'button {background-color:#333; border:1px solid #666; cursor:pointer; padding:2px 4px;}'+
 	'button.inline {margin:-1px -3px; padding:0 2px;}'+
 	'#tag_editor {margin:5px;} ol#tag_editor {padding:0; list-style:none;}'+
-	'.tags_in_li {display:inline-block; vertical-align:bottom; margin:0 0 0 1ch;}'+
+	'input.tags_in {width:100%;}'+
+	'.tags_in_li {width:85%; display:inline-block; vertical-align:bottom; margin:0 0 0 1ch;}'+
 	'.key {background-color:#333; border:1px solid #666; padding:0 0.5ch 0 0.4ch; border-radius:0.5ch;}'+
 	'.curr_line {background-color:#444;} li.curr_line {margin:0 -13px; padding:0 13px;}'+
 	'.tagstr, .tags_in {color:#ffd700;}'+
@@ -81,26 +78,21 @@ win.menu = win.menu || menu({type:'menubar'},[
 	var m_prev; if (rmac) (function(){if (shown) {var m = macros()
 		// if (!$('#macros').length) {m_prev=0; $('#body').append($('<table id="macros">')); $.css}
 		// if (!_.isEqual(m_prev,m)) {$('#macros').html(_.pairs(m).map(function(v){return $('<tr>').html([$('<td>').text(v[0]),$('<td>').text(v[1])])})); size_and_center()}
-		$('.tags_in').map(function(i,v){var t; if ((t=$(v).textn().match(/^(.*?)(\S+) $/)) && $(v).text() !== (t=t[1]+(m[t[2]]||t[2])+'\xa0')) {$(v).text(t); c_focus()}})
+		$('.tags_in').map(function(i,v){var t; if ((t=$(v).val().match(/^(.*?)(\S+) $/)) && $(v).val() !== (t=t[1]+(m[t[2]]||t[2])+'\xa0')) {tags_set(i,t); c_focus()}})
 		m_prev = m}}).every(0.2)
 	})()
 
-// much less important:
+// less important:
 //! when adding to the top and bottom, current selection should try to stay in the same place
 //! resizing and/or moving the window flashes it white
 
-// less important:
+// eep:
 //! sufficiently faraway times should be longer!
 //! sufficiently nearby times could be shorter! dynamically so, even! yeah. dynamically.
-//! i wanna see the blinky thing!
-
-// very important:
-//! when to add afk to things?
 
 var C = function(v){var id; var c = v.split(' ').filter(function(v){var t; if (t=v.match(/^#(.*)/)) id = t[1]; return !t}).join(' '); return (id?' id="'+id+'"':'')+(c!==''?' class="'+c+'"':'')}
 var S = function(c){return $('<span'+C(c)+'>')}
 var Key = function(v){return S('key').html(v)}
-var Expando_input = function(co,ci){return $('<div'+C(co)+'><div class="expando_input '+ci+'" contenteditable="true"></div></div>')}
 
 win.size_and_center = function(op){op=op||{}; var yb; var xw; var yw
 	this.setResizable(true)
@@ -116,26 +108,24 @@ var c_get_next = function(){var t; return cur.is($('#submit'))? c_first()       
 var c_get_prev = function(){var t; return cur.is($('#submit'))? $('#tag_editor > *').last() : (t=cur.prev()).length? t : $('#submit')}
 var c_next = function(){c_set(c_get_next()); c_focus(); return false}
 var c_prev = function(){c_set(c_get_prev()); c_focus(); return false}
-var c_focus = function(){cur.focus_end()}
+var c_focus = function(){((t=cur.find_self('input')).length? t : cur).focus()}
 var c_at_end = function(){return cur.is($('#submit')) || $('#body').hasClass('editor_single')}
 
 var c_focus_some_always = function(){
 	c_focus()
-	$(window).on('click',c_focus())
+	$(window).on('click',c_focus)
 	if ($('#body').hasClass('editor_single')) $('.tags_in').on('click',function(e){e.stopPropagation()})
 	else $('#tag_editor').on('click','li',function(e){e.stopPropagation(); c_set($(this)); c_focus()})
 	}
 
-var single_ditto = function(e){var t; if (prev_ping&&prev_ping.tags!=='') {e.preventDefault(); (t=c_line()).text(global.tags_union(t.textn(),prev_ping.tags)); return_and_close()}}
-var multi_ditto = function(e){var t; e.preventDefault(); if (c_at_end()) return_and_close(); else {copy_gui_tags_to_ping_tags(); var prev = [prev_ping].concat(pings)[cur.index()+1-1]; if (prev&&prev.tags!=='') (t=c_line()).text(global.tags_union(t.textn(),prev.tags)); c_next()}}
+var single_ditto = function(e){if (prev_ping&&prev_ping.tags!=='') {e.preventDefault(); tags_set(cur.index(),global.tags_union(c_line().val(),prev_ping.tags)); return_and_close()}}
+var multi_ditto = function(e){e.preventDefault(); if (c_at_end()) return_and_close(); else {var prev = [prev_ping].concat(pings).slice(0,cur.index()+1).reverse().find(function(v){return v.tags!==''}); if (prev) tags_set(cur.index(),global.tags_union(c_line().val(),prev.tags)); c_next()}}
 
-var ping_in = function(co,v){var t=Expando_input(co,'tags_in'); t.find('.tags_in').text(v.tags); return t}
-var ping_li = function(v){return $('<li>').html([S('time').html(moment(v.time).format('HH:mm:ss')),ping_in('tags_in_li',v)])}
+var ping_in = function(co,v){var t=$('<input class="tags_in">'); t.val(v.tags); return $('<div'+C(co)+'>').html(t)}
+var ping_li = function(v){return $('<li>').html([S('time time-row').html(moment(v.time).format('HH:mm:ss')),ping_in('tags_in_li',v)])}
 
-var copy_gui_tags_to_ping_tags = function(){ //! remove, maybe just with the unification
-	if ($('.tags_in').length === pings.length) [pings,$('.tags_in').toArray().map(function(v){return $(v).textn()})].zipmap(function(v,tags){v.tags = global.tags_norm(tags)})
-	else err('oh gosh!',$('.tags_in').length,pings.length)
-	}
+$(document).on('input','.tags_in',function(){pings[cur.index()].tags = $(this).val()})
+var tags_set = function(i,v){$('.tags_in').eq(i).val(v); pings[i].tags = v}
 
 var future    = function(v){return v.time > now()}
 var late      = function(v){return Math.abs(now()-v.time) > 20}
@@ -151,14 +141,13 @@ var build_single_editor = function(){
 
 	cur = c_first()
 	c_focus_some_always()
+	prev_ping_set(prev_ping)
 
-	$('.tags_in').on_key('↩',function(){if (cur.text()!=='') return_and_close(); return false})
+	$('.tags_in').on_key('↩',function(){if (cur.val()!=='') return_and_close(); return false})
 	$('.tags_in').on_key('⇥',function(){return false})
-	
-	$('.tags_in, #submit').on_key('↑',function(){if (cur.is(c_first())) ping_unshift_if(); else c_prev(); return false})
+	$('.tags_in, #submit').on_key('↑',function(){ping_unshift_if(); return false})
 	$('#ditto').on('click',single_ditto)
 	$('.tags_in, #submit').on_key('\'',single_ditto)
-	prev_ping_set(prev_ping)
 
 	size_and_center() }
 var build_multi_editor = function(){var t
@@ -174,25 +163,24 @@ var build_multi_editor = function(){var t
 
 	c_set(c_first())
 	c_focus_some_always()
+	prev_ping_set(prev_ping)
 
 	$('#tag_editor').on_key('↩','.tags_in',c_next)
 	$('#tag_editor').on_key('⇥','.tags_in',c_next)
 	$('#tag_editor').on_key('↓','.tags_in',c_next)
 	$('#submit').on_key('⇥',c_next)
 	$('#submit').on_key('↓',c_next)
-	$('#submit').on('click',return_and_close)
 
+	$('#submit').on('click',return_and_close)
 	$('#tag_editor').on_key('↑','.tags_in',t=function(){if (cur.is(c_first())) ping_unshift_if(c_prev); else c_prev(); return false})
 	$('#submit').on_key('↑',t)
 	$('#ditto').on('click',multi_ditto)
 	$('#tag_editor').on_key('\'','.tags_in',multi_ditto)
 	$('#submit').on_key('\'',multi_ditto)
-	prev_ping_set(prev_ping)
 
 	size_and_center() }
 
 var ping_push = function(v,begin){lock.readLock('gui',function(rel){
-	if (shown && pings.length===1) copy_gui_tags_to_ping_tags()
 	pings[begin? 'unshift' : 'push'](v)
 	if (shown) {
 		if (pings.length===2) {$('body').html(''); build_multi_editor()}
@@ -218,14 +206,15 @@ var build_gui = function(cb){lock.writeLock('gui',function(rel){
 
 var beep = function(){if (shown) new Audio(global.fs(global.rc.ping_sound).realpath()).play()}
 
-var return_and_close = function(canceled){
+var return_and_close = function(canceled){try {
 	done = true
-	copy_gui_tags_to_ping_tags()
-	if (canceled===true) pings.forEach(function(v){v.tags = global.tags_union(v.tags,'canceled')})
 	win.close(true)
-	return_cb(null,pings)}
+	global.win.setShowInTaskbar(false)
+	if (canceled===true) pings.forEach(function(v){v.tags = global.tags_union(v.tags,'canceled')})
+	return_cb(null,pings)
+	} catch (e) {win.close(true); global.win.setShowInTaskbar(false); return_cb(e); throw e} }
 
-win.on('close',function(){try {return_and_close(true)} catch (e) {win.close(true); global.win.setShowInTaskbar(false); return_cb(e); throw e}})
+win.on('close',function(){return_and_close(true)})
 
 $(window).mouseenter(win.showf)
 

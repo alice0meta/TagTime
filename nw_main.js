@@ -31,7 +31,7 @@ poll(function(){return global.window},function(e,v){
 	global.gui = window.nwDispatcher.requireNwGui()
 	global.win = gui.Window.get(window)
 	var argv = gui.App.argv.slice(1)
-	if (argv.slice(-1)[0]==='-d') {win.showDevTools(); argv=argv.slice(0,-1)}
+	if (argv[-1]==='-d') {win.showDevTools(); argv=argv.slice(0,-1)}
 	switch (argv[0]) {
 		case 'daemon': schedule_update_checks(schedule_pings); break
 		case 'prompt':

@@ -3,7 +3,6 @@ t="${BASH_SOURCE[0]}"; while [ -h "$t" ]; do d="$(cd -P "$(dirname "$t")" && pwd
 
 stop() { t=$(pgrep -f 'webkit.*tagtime'); [[ "$t" ]] && { echo "killing existing tagtime process $t"; kill $t; } }
 
-#//! command line json parser
 ttnw() { node-webkit-v0.10.0.app/Contents/MacOS/node-webkit tagtime.nw "$@"; }
 
 ensure_node() { type node &>/dev/null || {
