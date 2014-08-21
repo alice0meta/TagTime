@@ -89,15 +89,19 @@ G.moment.fn.inspect = function(){return '\x1b[35m'+this.toString()+'\x1b[39m'}
 
 var set_prototypes; ;(set_prototypes = function(G){
 
+//! this timeout code is pretty shit.
+
+var poll_fns; setInterval(function(){var t = poll_fns; poll_fns = []; poll_fns.push.apply(poll_fns,(t||[]).filter(function(v){var n; if (!v.called) {clearTimeout(v.id); if (!v.called) {if (v.at < (n=now())) {v.f(); return false} else v.id = setTimeout(v.f,v.at-n)}}; return true}))},0.1*1000)
+
 G.Function.prototype.def = function(m,get,set){Object.defineProperty(this.prototype,m,{configurable:true, enumerable:false, get:get, set:set}); return this}
 ;[G.Array,G.String].forEach(function(Class){_.range(0,5).forEach(function(i){Class.def('-'+i,function(){return this.length<i? undefined : this[this.length-i]},function(v){return this.length<i? v : this[this.length-i] = v})})})
 G.Array.prototype.find = function(f,ctx){return _.find(this,f,ctx)}
 G.String.prototype.repeat = function(v){return new G.Array(v+1).join(this)}
 G.Array.prototype.ζ0_concat = function(){return G.Array.prototype.concat.apply([],this)}
-G.Function.prototype.in = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return !time || time<=0? (setImmediate||setTimeout).apply(null,[this].concat(args)) : setTimeout.apply(null,[this,time*1000].concat(args))}
+G.Array.prototype.zipmap = function(f,ctx){return _.zip.apply(_,this).map(function(v){return f.apply(ctx,v)})}
+G.Function.prototype.in = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return !time || time <= 0? setImmediate.apply(null,[this].concat(args)) : time <= 1? setTimeout.apply(null,[this,time*1000].concat(args)) : poll_fns.push({f:function(){this.called = true; f.apply(null,args)}, at:time+now()})}
 G.Function.prototype.at = function(time){arguments[0] -= now(); return this.in.apply(this,arguments)}
 G.Function.prototype.every = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return setInterval.apply(null,[this,time*1000].concat(args))}
-G.Array.prototype.zipmap = function(f,ctx){return _.zip.apply(_,this).map(function(v){return f.apply(ctx,v)})}
 
 })(G)
 

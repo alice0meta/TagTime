@@ -31,6 +31,7 @@ we are avoiding binary packages so that we don't have to bother with nw-gyp or b
 // "(@alice, in case this is an easy fix: i drag the tagtime prompt to secondary screen and leave it there. on next ping it jumps to the corresponding place on primary screen. better if it didn't move on you)"
 // fix up the readme
 // oh dear, ζtt is _not_ very window-sanitary. dependency: work on ζ₀
+// check if the graph is do-more or do-less and do the uploading order accordingly
 
 // todo:
 //! automatically run on startup
@@ -40,23 +41,7 @@ we are avoiding binary packages so that we don't have to bother with nw-gyp or b
 //! btw, we should have a logfile. and maybe make it work for everything (install script, etc) not just the clogs?
 //! people who don't use tagtime all the time want "only run during certain hours" and "don't bother logging afk/canceled pings" modes
 //! handle being pinged while you're typing
-//! OH DEAR wacky crashing bug
-//!    i think it should be super explicit like "your computer seems to be bogged down". usually that will have been painfully obvious to you which is actually reassuring for tagtime to notice and warn you and tell you exactly why. and if it ever happens for no apparent reason then it would probably be good to get a bug report about that - how about "This ping is $x seconds late! If this doesn't seem like your computer's fault you can _submit a bug report_ [link]." link code: gui.Shell.openExternal('https://github.com/rogerwang/node-webkit')
-
-ah.
-2014-08-12T01:12:28Z PROMPT for [ 2014-08-11T18:53:46Z,
-  2014-08-11T19:20:02Z,
-  2014-08-11T19:43:47Z,
-  2014-08-11T19:44:27Z,
-  2014-08-11T19:58:27Z,
-  2014-08-11T20:37:24Z,
-  2014-08-11T22:15:20Z,
-  2014-08-11T22:30:56Z,
-  2014-08-11T23:00:40Z,
-  2014-08-11T23:36:54Z,
-  2014-08-11T23:50:03Z,
-  2014-08-12T00:41:37Z,
-  2014-08-12T01:02:09Z ]
+//! i think it should be super explicit like "your computer seems to be bogged down". usually that will have been painfully obvious to you which is actually reassuring for tagtime to notice and warn you and tell you exactly why. and if it ever happens for no apparent reason then it would probably be good to get a bug report about that - how about "This ping is $x seconds late! If this doesn't seem like your computer's fault you can _submit a bug report_ [link]." link code: gui.Shell.openExternal('https://github.com/rogerwang/node-webkit')
 
 //===---------------------===// pile from a padm //===---------------------===//
 
