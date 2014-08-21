@@ -99,7 +99,7 @@ G.Array.prototype.find = function(f,ctx){return _.find(this,f,ctx)}
 G.String.prototype.repeat = function(v){return new G.Array(v+1).join(this)}
 G.Array.prototype.ζ0_concat = function(){return G.Array.prototype.concat.apply([],this)}
 G.Array.prototype.zipmap = function(f,ctx){return _.zip.apply(_,this).map(function(v){return f.apply(ctx,v)})}
-G.Function.prototype.in = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return !time || time <= 0? setImmediate.apply(null,[this].concat(args)) : time <= 1? setTimeout.apply(null,[this,time*1000].concat(args)) : poll_fns.push({f:function(){this.called = true; f.apply(null,args)}, at:time+now()})}
+G.Function.prototype.in = function(time){var f = this; var args = G.Array.prototype.slice.call(arguments).slice(1); return !time || time <= 0? setImmediate.apply(null,[f].concat(args)) : time <= 1? setTimeout.apply(null,[f,time*1000].concat(args)) : poll_fns.push({f:function(){this.called = true; f.apply(null,args)}, at:time+now()})}
 G.Function.prototype.at = function(time){arguments[0] -= now(); return this.in.apply(this,arguments)}
 G.Function.prototype.every = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return setInterval.apply(null,[this,time*1000].concat(args))}
 
