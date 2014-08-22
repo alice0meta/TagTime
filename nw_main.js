@@ -25,7 +25,7 @@ var schedule_pings = function(){var t
 				})
 			})} })() }
 
-var schedule_update_checks = function λ(cb){cmp_versions(function(e,v){if (v) {clog('UPDATE tagtime',v); update(); process.exit()} else {if (cb) {cb(); cb = null}; λ.at(now()+3600)}})}
+var schedule_update_checks = function λ(cb){cmp_versions(function(e,v){if (v) {clog('UPDATE tagtime',v); update(function(){clog('UPDATED to',JSON.parse(fs('package.json').$).version); process.exit()})} else {if (cb) {cb(); cb = null}; λ.at(now()+3600)}})}
 
 poll(function(){return global.window},function(e,v){
 	global.gui = window.nwDispatcher.requireNwGui()
