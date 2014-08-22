@@ -51,18 +51,9 @@ Ideas for using TagTime:
 * As the basis for a commitment device for working 40 hours a week, wasting less time on the internet, etc.  
 
 Ideas for further development of TagTime:
-* A gui pie chart interface (mmm.. gooey pie..) where it pings you by 
-  showing a pie chart of where your time has been going and you click on 
-  the pie slice for what you were doing right then. (This idea is why TagTime 
-  was originally called TimePie.)
-* There are some interesting things we could do with this with no 
-  intervention at all.  Like just keep track of how often your
-  computer is on, or on and network-connected, or connected to various 
-  wireless networks (indicating fraction of time at home vs work), or
-  it could even make inferences based on what program you have running
-  in the foreground.  See the mac program, slife, or rescuetime.com.
-* Figure out the confidence intervals based on the samples (pie slices 
-  could have fuzzy boundaries to indicate confidence intervals).
+* A gui pie chart interface (mmm.. gooey pie..) where it pings you by showing a pie chart of where your time has been going and you click on the pie slice for what you were doing right then. (This idea is why TagTime was originally called TimePie.)
+* There are some interesting things we could do with this with no intervention at all.  Like just keep track of how often your computer is on, or on and network-connected, or connected to various wireless networks (indicating fraction of time at home vs work), or it could even make inferences based on what program you have running in the foreground.  See the mac program, slife, or rescuetime.com.
+* Figure out the confidence intervals based on the samples (pie slices could have fuzzy boundaries to indicate confidence intervals).
 * Badge/widget for your website with your time pie.
 * Thoughts on visualization: http://stackoverflow.com/questions/3224494/data-visualization-bubble-charts-venn
 
@@ -81,8 +72,3 @@ Ideas for auto-tags (ie, tags the computer can figure out on its own):
 8. loud, quiet -- by polling the microphone
 9. bright, dark -- by polling the camera   
 10. typing -- by checking when the last keystroke was typed
-
-NOTES TO OURSELVES:
-
-2. Daemon question (from Rob)
-The standard way to check if a daemon is running is to use the status command.
