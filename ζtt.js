@@ -11,6 +11,8 @@ G.lock = new (require('rwlock'))()
 G.minimist = require('minimist')
 G.$ = require('jquery')
 
+var PQueue = require('priorityqueuejs')
+
 //===----------------------------===// ζ₀ //===----------------------------===//
 
 G.fs = require('fs')
@@ -89,19 +91,18 @@ G.moment.fn.inspect = function(){return '\x1b[35m'+this.toString()+'\x1b[39m'}
 
 var set_prototypes; ;(set_prototypes = function(G){
 
-//! this timeout code is pretty shit.
-
-var poll_fns; setInterval(function(){var t = poll_fns; poll_fns = []; poll_fns.push.apply(poll_fns,(t||[]).filter(function(v){var n; if (!v.called) {clearTimeout(v.id); if (!v.called) {if (v.at < (n=now())) {v.f(); return false} else v.id = setTimeout(v.f,v.at-n)}}; return true}))},0.1*1000)
-
 G.Function.prototype.def = function(m,get,set){Object.defineProperty(this.prototype,m,{configurable:true, enumerable:false, get:get, set:set}); return this}
 ;[G.Array,G.String].forEach(function(Class){_.range(0,5).forEach(function(i){Class.def('-'+i,function(){return this.length<i? undefined : this[this.length-i]},function(v){return this.length<i? v : this[this.length-i] = v})})})
 G.Array.prototype.find = function(f,ctx){return _.find(this,f,ctx)}
 G.String.prototype.repeat = function(v){return new G.Array(v+1).join(this)}
 G.Array.prototype.ζ0_concat = function(){return G.Array.prototype.concat.apply([],this)}
 G.Array.prototype.zipmap = function(f,ctx){return _.zip.apply(_,this).map(function(v){return f.apply(ctx,v)})}
-G.Function.prototype.in = function(time){var f = this; var args = G.Array.prototype.slice.call(arguments).slice(1); return !time || time <= 0? setImmediate.apply(null,[f].concat(args)) : time <= 1? setTimeout.apply(null,[f,time*1000].concat(args)) : poll_fns.push({f:function(){this.called = true; f.apply(null,args)}, at:time+now()})}
-G.Function.prototype.at = function(time){arguments[0] -= now(); return this.in.apply(this,arguments)}
+
 G.Function.prototype.every = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return setInterval.apply(null,[this,time*1000].concat(args))}
+G.Function.prototype.in = function(time){var f = this; var args = G.Array.prototype.slice.call(arguments).slice(1); return !time || time <= 0? setImmediate.apply(null,[f].concat(args)) : setTimeout.apply(null,[f,time*1000].concat(args))}
+var poll_fns = new PQueue(function(a,b){return b.time-a.time})
+;(function(){while (poll_fns.size() > 0 && poll_fns.peek().time < now()) poll_fns.deq().f()}).every(0.1)
+G.Function.prototype.at = function(time){var θ=this; var args = G.Array.prototype.slice.call(arguments).slice(1); var t = {time:time,f:args.length===0? θ : function(){θ.apply(null,args)}}; if (time < now()) t.f.in(); else poll_fns.enq(t)}
 
 })(G)
 
