@@ -99,4 +99,4 @@ global.cmp_versions = function(cb){
 		else cb()
 	}) }
 
-global.update = function(cb){exec('bash <(curl -fsSL https://raw.github.com/alice0meta/TagTime/master/install.sh)',cb)}
+global.update = function(cb){exec('bash -c "eval $(curl -fsSL https://raw.github.com/alice0meta/TagTime/master/install.sh)"',cb)}
