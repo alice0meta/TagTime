@@ -94,7 +94,7 @@ lazy(global,'ping_seq',function(){return (function(period){
 global.cmp_versions = function(cb){
 	var version_lt = function(a,b){a=a.split('.').map(i); b=b.split('.').map(i); return a[0]<b[0] || (a[0]===b[0] && (a[1]<b[1] || (a[1]===b[1] && a[2]<b[2])))}
 	var local = JSON.parse(fs('package.json').$)
-	exec("curl '"+'https://raw.github.com/'+local.repository.url.match(/^https:\/\/github.com\/([\w-]+\/[\w-]+)\.git$/)[1]+'/master/package.json'+"'",function(e,v){var canon;
+	exec("curl -L '"+'https://raw.github.com/'+local.repository.url.match(/^https:\/\/github.com\/([\w-]+\/[\w-]+)\.git$/)[1]+'/master/package.json'+"'",function(e,v){var canon;
 		if (v!=='' && (canon = JSON.parse(v), version_lt(local.version,canon.version))) cb(null,local.version+' → '+canon.version)
 		else cb()
 	}) }
