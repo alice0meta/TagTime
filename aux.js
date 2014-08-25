@@ -72,17 +72,17 @@ lazy(global,'ping_seq',function(){return (function(period){
 		ping.seed = pow(7,5)*ping.seed % (pow(2,31)-1) // ran0 from Numerical Recipes
 		ping.time += round(max(1,-45*60*log(ping.seed / (pow(2,31)-1)))) }
 	var keep = function(v){return !v.fraction || bit_reverse_i(31,v.seed) / (pow(2,31)-1) <= v.fraction}
-	var next_s = function(v){var existing = _.pluck(seqs,'time'); do {ping_next(v)} while (!keep(v)); while (_.contains(existing,v.time)) v.time += 1; return v}
+	var next_s = function(v){var existing = seqs._.pluck('time'); do {ping_next(v)} while (!keep(v)); while (existing._.contains(v.time)) v.time += 1; return v}
 	
-	var seqs
-	var reset_before = function(time){if (!seqs || time < getv()) {
+	var seqs = []
+	var reset_before = function(time){if (!seqs || !seqs.length || time < getv()) {
 		var n = 45 / period
 		seqs = _.range(ceil(n)).map(function(v){var t = _.clone(epoch); t.seed += v; return t}).map(next_s)
 		if (ceil(n)-n !== 0) seqs[-1].fraction = 1-(ceil(n)-n)
 		}}
-	var getv = function(){var r = _.min(seqs,function(v){return v.time}).time; return r}
+	var getv = function(){var r = seqs._.min(function(v){return v.time}).time; return r}
 	var get = function(){return {time:getv(), period:period}}
-	var next = function(){next_s(_.min(seqs,function(v){return v.time}))}
+	var next = function(){next_s(seqs._.min(function(v){return v.time}))}
 	
 	reset_before(now())
 	return ζ0_def({
@@ -94,9 +94,9 @@ lazy(global,'ping_seq',function(){return (function(period){
 global.cmp_versions = function(cb){
 	var version_lt = function(a,b){a=a.split('.').map(i); b=b.split('.').map(i); return a[0]<b[0] || (a[0]===b[0] && (a[1]<b[1] || (a[1]===b[1] && a[2]<b[2])))}
 	var local = JSON.parse(fs('package.json').$)
-	exec("curl '"+'https://raw.githubusercontent.com/'+local.repository.url.match(/^https:\/\/github.com\/([\w-]+\/[\w-]+)\.git$/)[1]+'/master/package.json'+"'",function(e,v){var canon;
+	exec("curl '"+'https://raw.github.com/'+local.repository.url.match(/^https:\/\/github.com\/([\w-]+\/[\w-]+)\.git$/)[1]+'/master/package.json'+"'",function(e,v){var canon;
 		if (v!=='' && (canon = JSON.parse(v), version_lt(local.version,canon.version))) cb(null,local.version+' → '+canon.version)
 		else cb()
 	}) }
 
-global.update = function(cb){exec('eval "$(curl -fsSL https://raw.github.com/alice0meta/TagTime/master/install.sh)"',cb)}
+global.update = function(cb){exec('bash <(curl -fsSL https://raw.github.com/alice0meta/TagTime/master/install.sh)',cb)}

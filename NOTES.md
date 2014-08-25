@@ -36,7 +36,6 @@ we are avoiding binary packages so that we don't have to bother with nw-gyp or b
 
 // todo:
 //! automatically run on startup
-//! ??sortedness of ping files??
 //! bah, fuck, i ate the timezone information again. fix?
 //! fix the cause of # NB: restart the daemon (tagtimed.pl) if you change this file. // you need to listen for changes to the settings file
 //! btw, we should have a logfile. and maybe make it work for everything (install script, etc) not just the clogs?

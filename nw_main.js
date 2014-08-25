@@ -39,7 +39,7 @@ poll(function(){return global.window},function(e,v){
 			prompt(function(e,gui){
 				gui.ping_before(function(time,cb){cb({time:time-2000,tags:prev}); prev = time+''})
 				gui.ping({time:time, period:45})
-				gui.show(function(e,pings){print(_.pluck(pings,'tags').join('\n')); if (!e) process.exit()})
+				gui.show(function(e,pings){print(pings._.pluck('tags').join('\n')); if (!e) process.exit()})
 			})
 			break
 		}

@@ -82,7 +82,7 @@ G.$.prototype.on_key = function(key,sel,cb0){if (!cb0) {cb0 = sel; sel = null}
 	this.on(((t[key]?{'↑':'keyup','↓':'keydown'}[t[key][1]]:0)||'keypress')+ns,sel,function(e){if (e.which===keyc) return cb0(e)}) }
 G.$.prototype.find_self = function(sel){return this.find(sel).add(this.filter(sel))}
 
-var t = moment; G.moment = function(i){return typeof(i)==='number' && arguments.length===1? t(i*1000) : t.apply(this,arguments)}; moment.__proto__ = t
+var tm = moment; G.moment = function(i){return typeof(i)==='number' && arguments.length===1? tm(i*1000) : tm.apply(this,arguments)}; moment.__proto__ = tm
 G.moment.fn.valueOf = function(){return +this._d/1000 + (this._offset||0)*60}
 G.moment.fn.toString = function(){return this.utc().format('YYYY-MM-DD[T]HH:mm:ss[Z]')}
 G.moment.fn.inspect = function(){return '\x1b[35m'+this.toString()+'\x1b[39m'}
@@ -97,6 +97,7 @@ G.Array.prototype.find = function(f,ctx){return _.find(this,f,ctx)}
 G.String.prototype.repeat = function(v){return new G.Array(v+1).join(this)}
 G.Array.prototype.ζ0_concat = function(){return G.Array.prototype.concat.apply([],this)}
 G.Array.prototype.zipmap = function(f,ctx){return _.zip.apply(_,this).map(function(v){return f.apply(ctx,v)})}
+G.Array.def('_',function(){return _(this)})
 
 G.Function.prototype.every = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return setInterval.apply(null,[this,time*1000].concat(args))}
 G.Function.prototype.in = function(time){var f = this; var args = G.Array.prototype.slice.call(arguments).slice(1); return !time || time <= 0? setImmediate.apply(null,[f].concat(args)) : setTimeout.apply(null,[f,time*1000].concat(args))}
@@ -108,5 +109,5 @@ G.Function.prototype.at = function(time){var θ=this; var args = G.Array.prototy
 
 //===---------------------------===// <end> //===--------------------------===//
 
-var fns = _.difference(_.keys(G),G_keys)
+var fns = _.keys(G)._.difference(G_keys)
 module.exports = function(window){if (window) {fns.forEach(function(v){window[v] = G[v]}); set_prototypes(window)}}
