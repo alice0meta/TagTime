@@ -12,6 +12,7 @@ we are avoiding binary packages so that we don't have to bother with nw-gyp or b
 // we want to deploy to windows, ✓ osx, linux, webapp, android, and ios
 
 // todo back:
+// verify we've got a valid auth token for the user we're trying to interact with (this especially handles the case in which the username is mistyped)
 // have read_graph cache its results
 // ‽ implement "In the future this should show a cool pie chart that lets you click on the appropriate pie slice, making that slice grow slightly. And the slice boundaries could be fuzzy to indicate the confidence intervals! Ooh, and you can drag the slices around to change the order so similar things are next to each other and it remembers that order for next time! That's gonna rock."
 //    so, when i took five minutes to consider "what would be a *good* interface for tagging?", i thought of "what about a field of 2-dimensional tag-cells, with size proportional to frequency, that can be persistently dragged around?"
@@ -72,3 +73,4 @@ Ideas for auto-tags (ie, tags the computer can figure out on its own):
 8. loud, quiet -- by polling the microphone
 9. bright, dark -- by polling the camera   
 10. typing -- by checking when the last keystroke was typed
+11. gps
