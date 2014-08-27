@@ -101,11 +101,14 @@ G.Array.def('_',function(){return _(this)})
 
 G.Function.prototype.every = function(time){var args = G.Array.prototype.slice.call(arguments).slice(1); return setInterval.apply(null,[this,time*1000].concat(args))}
 G.Function.prototype.in = function(time){var f = this; var args = G.Array.prototype.slice.call(arguments).slice(1); return !time || time <= 0? setImmediate.apply(null,[f].concat(args)) : setTimeout.apply(null,[f,time*1000].concat(args))}
-var poll_fns = new PQueue(function(a,b){return b.time-a.time})
-;(function(){while (poll_fns.size() > 0 && poll_fns.peek().time < now()) poll_fns.deq().f()}).every(0.1)
-G.Function.prototype.at = function(time){var θ=this; var args = G.Array.prototype.slice.call(arguments).slice(1); var t = {time:time,f:args.length===0? θ : function(){θ.apply(null,args)}}; if (time < now()) t.f.in(); else poll_fns.enq(t)}
+G.Function.prototype.at = function(time){var θ=this; var args = G.Array.prototype.slice.call(arguments).slice(1); var t = {time:time,f:args.length===0? θ : function(){θ.apply(null,args)}}; if (time < now()) {t.f.in(); return {clear:function(){}}} else {poll_fns.enq(t); return {clear:function(){t.canceled = true}}}}
 
 })(G)
+
+var poll_fns = new PQueue(function(a,b){return b.time-a.time})
+;(function(){
+	clog('polling',now(),poll_fns._elements._.pluck('time').map(function(v){return v-now()}),poll_fns)
+	while (poll_fns.size() > 0 && poll_fns.peek().time < now()) {var t=poll_fns.deq(); t.canceled || t.f()}}).every(3)
 
 //===---------------------------===// <end> //===--------------------------===//
 

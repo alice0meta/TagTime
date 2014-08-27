@@ -61,7 +61,7 @@ var generate_actions = function(user_slug,f_pings,b_pings){var t
 			DELETE.map(function(v){return 'BEE_SYNC - '+user_slug+' '+ymd(v)+' '+v.id}),
 			].ζ0_concat(),
 		cmds: [
-			CREATE.length? [[user_slug+'.datapoints ~=',CREATE]] : [],
+			CREATE.length? [[user_slug+'.datapoints *=',CREATE]] : [],
 			UPDATE._.sortBy(3).map(function(v){return [user_slug+'.datapoints['+v[1]+'] =',v[2]]}),
 			DELETE.map(function(v){return [user_slug+'.datapoints['+v.id+'] =']}),
 			].ζ0_concat(),
@@ -78,7 +78,7 @@ var sync_bee = function(args,cb){
 		10,
 		function(e,action_sets){
 			action_sets._.pluck('msgs').ζ0_concat().map(function(v){clog(v)})
-			if (!args.dry) async.parallelLimit(action_sets._.pluck('cmds').ζ0_concat().map(function(v){return function(cb){beeminder.apply(null,v.concat([cb]))}}),10,cb)
+			if (!args.dry) async.parallelLimit(action_sets._.pluck('cmds').ζ0_concat().map(function(v){return function(cb){beeminder.apply(null,[].concat(v,[cb]))}}),10,cb)
 			else cb&&cb.in()
 		} ) }
 

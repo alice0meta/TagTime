@@ -17,7 +17,7 @@ var schedule_pings = function(){var t
 				already.map(gui.ping)
 				var λt; ;(function λ(){λt = (function(){if (gui.ping(ps[0])) {already.push(ps[0]); ps.next(); λ()}}).at(ps[0].time)})()
 				gui.show(function(e,pings){
-					clearTimeout(λt)
+					λt.clear()
 					if (pings.length !== already.length) {print('eep! I think you scrolled up!'); pings = pings.slice(pings.length - already.length)} //!
 					pings.forEach(function(v){ping_file(rc.ping_file).append(v)})
 					sync()

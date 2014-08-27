@@ -40,7 +40,7 @@ global.beeminder = function(v){var a = arguments; var cb = a[a.length-1]; var ar
 	var t1 = cb; cb = function(e,v){t1(e, e? v : v.json)}
 	var ug = v.match(/^(.+)\/(.+)$/)
 	var ugd = v.match(/^(.+)\/(.+)\.datapoints$/)
-	var ugdc = v.match(/^(.+)\/(.+)\.datapoints ~=$/)
+	var ugdc = v.match(/^(.+)\/(.+)\.datapoints *=$/)
 	var ugdu = v.match(/^(.+)\/(.+)\.datapoints\[(.+)\] =$/)
 	if (!ug) request('GET',base+'users/'+v+'.json',auth,{},cb)
 	else if (ugd) request('GET',base+'users/'+ugd[1]+'/goals/'+ugd[2]+'/datapoints.json',auth,{},cb)
