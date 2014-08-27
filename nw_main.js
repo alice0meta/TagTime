@@ -2,7 +2,10 @@ require('./ζtt.js')
 require('./aux.js')
 var sync = require('./sync.js')
 
-var prompt = function(cb){gui.Window.open('prompt.html',{frame:false, show:false, 'always-on-top':true}).init_cb = cb}
+var prompt = function(cb){
+	try {gui.Window.open('prompt.html',{frame:false, show:false, 'always-on-top':true}).init_cb = cb}
+	catch (e) {clog('ERROR when opening prompt',e); throw e}
+	}
 
 var schedule_pings = function(){var t
 	var n; clog('BEGIN last ping was',moment(t=ping_seq.le(n=now()).time),'(',format_dur(n-t),'ago )')
@@ -13,6 +16,7 @@ var schedule_pings = function(){var t
 		else {
 			clog('PROMPT for',already.map(function(v){return moment(v.time)}))
 			prompt(function(e,gui){
+				clog('SENDING PINGS',already._.pluck('time'))
 				var pfl = ping_file(rc.ping_file).$.slice(-200); gui.ping_before(function(time,cb){if (pfl[-1]&&pfl[-1].time < time) cb(pfl.pop()); else cb()})
 				already.map(gui.ping)
 				var λt; ;(function λ(){λt = (function(){if (gui.ping(ps[0])) {already.push(ps[0]); ps.next(); λ()}}).at(ps[0].time)})()
@@ -20,6 +24,7 @@ var schedule_pings = function(){var t
 					λt.clear()
 					if (pings.length !== already.length) {print('eep! I think you scrolled up!'); pings = pings.slice(pings.length - already.length)} //!
 					pings.forEach(function(v){ping_file(rc.ping_file).append(v)})
+					clog('GOT PINGS',pings._.pluck('time'))
 					sync()
 					λ()
 				})
