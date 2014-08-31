@@ -2,10 +2,9 @@ require('./ζtt.js')
 require('./aux.js')
 var sync = require('./sync.js')
 
-var prompt = function(cb){
-	try {gui.Window.open('prompt.html',{frame:false, show:false, 'always-on-top':true}).init_cb = cb}
-	catch (e) {clog('ERROR when opening prompt',e); throw e}
-	}
+var open_broke_t //! gui.Window.open sometimes quietly fails D:
+global.prompt_open_success = function(){clearTimeout(open_broke_t)}
+var prompt = function(cb){gui.Window.open('prompt.html',{frame:false, show:false, 'always-on-top':true}).init_cb = cb; open_broke_t = prompt.in(5,cb)}
 
 var schedule_pings = function(){var t
 	var n; clog('BEGIN last ping was',moment(t=ping_seq.le(n=now()).time),'(',format_dur(n-t),'ago )')
@@ -30,7 +29,7 @@ var schedule_pings = function(){var t
 				})
 			})} })() }
 
-var schedule_update_checks = function λ(cb){cmp_versions(function(e,v){if (v) {clog('UPDATE tagtime',v); update(function(){clog('UPDATED to',JSON.parse(fs('package.json').$).version); process.exit()})} else {if (cb) {cb(); cb = null}; λ.at(now()+3600)}})}
+var schedule_update_checks = function λ(cb){cmp_versions(function(e,v){if (v) {clog('UPDATE tagtime',v); update(function(){clog('UPDATED to',JSON.parse(fs('package.json').$).version)})} else {if (cb) {cb(); cb = null}; λ.at(now()+3600)}})}
 
 poll(function(){return global.window},function(e,v){
 	global.gui = window.nwDispatcher.requireNwGui()

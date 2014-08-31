@@ -106,9 +106,10 @@ G.Function.prototype.at = function(time){var θ=this; var args = G.Array.prototy
 })(G)
 
 var poll_fns = new PQueue(function(a,b){return b.time-a.time})
+var ii=0
 ;(function(){
-	clog('polling',now(),poll_fns._elements._.pluck('time').map(function(v){return v-now()}),poll_fns)
-	while (poll_fns.size() > 0 && poll_fns.peek().time < now()) {var t=poll_fns.deq(); t.canceled || t.f()}}).every(3)
+	if (ii++ % 1000 === 0) clog('polling',poll_fns._elements._.pluck('time'))
+	while (poll_fns.size() > 0 && poll_fns.peek().time < now()) {var t=poll_fns.deq(); t.canceled || t.f()}}).every(0.1)
 
 //===---------------------------===// <end> //===--------------------------===//
 
