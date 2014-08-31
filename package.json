@@ -1,7 +1,7 @@
 {
   "name": "tagtime",
   "description": "desktop tagtime",
-  "version": "0.3.22",
+  "version": "0.3.23",
   "repository": {
     "type": "git",
     "url": "https://github.com/alice0meta/TagTime.git"
