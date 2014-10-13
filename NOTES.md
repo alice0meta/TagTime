@@ -33,6 +33,8 @@ we are avoiding binary packages so that we don't have to bother with nw-gyp or b
 // fix up the readme
 // oh dear, ζtt is _not_ very window-sanitary. dependency: work on ζ₀
 // check if the graph is do-more or do-less and do the uploading order accordingly
+// https://mail.google.com/mail/u/1/?zx=ugrzciuivp11#inbox/14830bccfe6df3ab
+// malcolm says: "tagtime integration with pebble"
 
 // todo:
 //! automatically run on startup
@@ -42,6 +44,9 @@ we are avoiding binary packages so that we don't have to bother with nw-gyp or b
 //! people who don't use tagtime all the time want "only run during certain hours" and "don't bother logging afk/canceled pings" modes
 //! handle being pinged while you're typing
 //! i think it should be super explicit like "your computer seems to be bogged down". usually that will have been painfully obvious to you which is actually reassuring for tagtime to notice and warn you and tell you exactly why. and if it ever happens for no apparent reason then it would probably be good to get a bug report about that - how about "This ping is $x seconds late! If this doesn't seem like your computer's fault you can _submit a bug report_ [link]." link code: gui.Shell.openExternal('https://github.com/rogerwang/node-webkit')
+//! "i think macro expansion in tagtime should be on enter as well as on space"
+//! http://nodejs.org/api/tty.html
+//! ooh, we maybe need to handle dropbox-style logfile syncing? that means killing ping windows if the log file updates with those pings - that is, always pinging just those pings which the log file is missing.
 
 //===---------------------===// pile from a padm //===---------------------===//
 

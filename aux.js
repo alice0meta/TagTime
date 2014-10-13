@@ -10,7 +10,7 @@ global.tags_norm = function(v){return tags_join(tags_split(v))}
 global.tags_union = function(){return tags_join(_.union.apply(_,A(arguments).map(tags_split)))}
 
 lazy(global,'rc',function(){
-	var f_settings = '~/TagTime/settings.json'
+	var f_settings = process.env.TTSETTINGS || '~/TagTime/settings.json'
 	if (!fs(f_settings).exists()) {
 		fs(f_settings).$ = (fs('settings.js').$+'').replace(/‹([^›]+)›/g,function(_,v){var t; return is(t=eval(v))?t:''})
 		print("hey, I've put a settings file at",f_settings,'for you. Go fill it in!')
@@ -80,7 +80,7 @@ lazy(global,'ping_seq',function(){return (function(period){
 		seqs = _.range(ceil(n)).map(function(v){var t = _.clone(epoch); t.seed += v; return t}).map(next_s)
 		if (ceil(n)-n !== 0) seqs[-1].fraction = 1-(ceil(n)-n)
 		}}
-	var getv = function(){var r = seqs._.min(function(v){return v.time}).time; return r}
+	var getv = function(){return seqs._.min(function(v){return v.time}).time}
 	var get = function(){return {time:getv(), period:period}}
 	var next = function(){next_s(seqs._.min(function(v){return v.time}))}
 	

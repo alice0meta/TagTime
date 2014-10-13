@@ -18,7 +18,7 @@ var PQueue = require('priorityqueuejs')
 G.fs = require('fs')
 G.path = require('path')
 G.moment = require('moment')
-G._ = require('underscore')
+var _ = G._ = G.u = require('underscore')
 var mkdirp = require('mkdirp')
 String.prototype.repeat = function(v){return new Array(v+1).join(this)}
 G.pad = function(v,s){return v+s.slice(v.length)}
@@ -108,7 +108,7 @@ G.Function.prototype.at = function(time){var θ=this; var args = G.Array.prototy
 var poll_fns = new PQueue(function(a,b){return b.time-a.time})
 var ii=0
 ;(function(){
-	if (ii++ % 1000 === 0) clog('polling',poll_fns._elements._.pluck('time'))
+	if (global.clog) if (ii++ % 1000 === 0) clog('polling',poll_fns._elements._.pluck('time'))
 	while (poll_fns.size() > 0 && poll_fns.peek().time < now()) {var t=poll_fns.deq(); t.canceled || t.f()}}).every(0.1)
 
 //===---------------------------===// <end> //===--------------------------===//
