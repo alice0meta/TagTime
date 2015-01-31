@@ -1,229 +1,41 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"></head><body></body></html><script>
-global.prompt_open_success()
+<!-- {
+	// resizable:false,
+		'always-on-top':true,
+		'auto-hide-menu-bar':true, 'skip-taskbar':true,
+	frame:false,
+	fullscreen:false,
+	unique:true,
+	} -->
+<!DOCTYPE html><html><head><meta charset="utf-8">
+	<title>tagtime prompt</title>
+	<style>
+		/* these styles are kinda shitty */
+		
+		/* behavior */
+		body {margin:8px; white-space:nowrap;}
+		body {-webkit-app-region:drag;} input, button {-webkit-app-region:no-drag;}
+		#body {display:inline-block;}
 
-require('./ζtt.js')(window)
-require('./aux.js')
-var clog = global.clog
-var gui = require('nw.gui')
-
-var win = gui.Window.get()
-var jquery = $; var $ = function(v){return jquery(v,document)}; $.__proto__ = jquery; $.prototype = jquery.prototype
-
-win.showf = function(){win.show(); win.focus()}
-$.css = function(v){$('head').append('<style>'+v+'</style>')}
-var menu = function(args,v){var r = args? new gui.Menu(args) : new gui.Menu(); v.forEach(function(v){
-	var t = {label:v[0].replace(/\$([\w_]+)/g,function(_,v){return nwDispatcher.getNSStringWithFixup('IDS_'+v+'_MAC')})}
-	if (v[1]) {t.modifiers = v[1].split('').slice(0,-1).map(function(v){return v.replace(/⌘/g,'cmd').replace(/⇧/g,'shift').replace(/⌥/g,'alt').replace(/\^/g,'ctrl')}).join('-'); t.key = v[1][-1]}
-	if (typeof(v[2])==='string') t.selector = v[2]
-	else if (typeof(v[2])==='function') {t.click = v[2]; if ({'⎋':1}[v[1]]) $(window).on_key(v[1],t.click)}
-	else t.submenu = v[2]
-	r.append(new gui.MenuItem(t))
-	}); return r}
-
-var return_cb
-var ping_before
-
-var prev_ping
-var pings = []
-var shown; var done
-var cur
-
-//! this file is a (less) monstrous mess
-
-$.css(
-	// behavior
-	'body {margin:8px; white-space:nowrap;}'+
-	'body {-webkit-app-region:drag;} input, button {-webkit-app-region:no-drag;}'+
-	'#body {display:inline-block;}'+
-
-	// general style
-	'* {outline:none;}'+
-	'p {margin:0;}'+
-	'button, input {color:inherit; font:inherit; background-color:inherit;}'+
-	'input {margin:0; padding:0; border:none;}'+
+		/* general style */
+		* {outline:none;}
+		p {margin:0;}
+		button, input {color:inherit; font:inherit; background-color:inherit;}
+		input {margin:0; padding:0; border:none;}
 	
-	// specific style
-	'body {background-color:#222; color:#fff; font-family:Monaco,monospace; font-size:12px;}'+
-	'button {background-color:#333; border:1px solid #666; cursor:pointer; padding:2px 4px;}'+
-	'button.inline {margin:-1px -3px; padding:0 2px;}'+
-	'#tag_editor {margin:5px;} ol#tag_editor {padding:0; list-style:none;}'+
-	'input.tags_in {width:100%;}'+
-	'.tags_in_li {width:85%; display:inline-block; vertical-align:bottom; margin:0 0 0 1ch;}'+
-	'.key {background-color:#333; border:1px solid #666; padding:0 0.5ch 0 0.4ch; border-radius:0.5ch;}'+
-	'.curr_line {background-color:#444;} li.curr_line {margin:0 -13px; padding:0 13px;}'+
-	'.tagstr, .tags_in {color:#ffd700;}'+
-	'.time {color:#08f;}'+
-	'em {background-color:#800; margin:0 -0.5ch; padding:0 0.5ch; font-style:normal;}'+
-	'')
+		/* specific style */
+		body {background-color:#222; color:#fff; font-family:Monaco,monospace; font-size:12px;}
+		button {background-color:#333; border:1px solid #666; cursor:pointer; padding:2px 4px;}
+		button.inline {margin:-1px -3px; padding:0 2px;}
+		#tag_editor {margin:5px;} ol#tag_editor {padding:0; list-style:none;}
+		input.tags_in {width:100%;}
+		.tags_in_li {width:85%; display:inline-block; vertical-align:bottom; margin:0 0 0 1ch;}
+		.key {background-color:#333; border:1px solid #666; padding:0 0.5ch 0 0.4ch; border-radius:0.5ch;}
+		.curr_line {background-color:#444;} li.curr_line {margin:0 -13px; padding:0 13px;}
+		.tagstr, .tags_in {color:#ffd700;}
+		.time {color:#08f;}
+		em {background-color:#800; margin:0 -0.5ch; padding:0 0.5ch; font-style:normal;}
+	</style>
+	<script>require('./'+require('path').basename(__filename,'.html'))</script>
+</head><body>
 
-win.menu = win.menu || menu({type:'menubar'},[
-	['',null,menu(null,[
-		['Cancel','⎋',function(){win.close()}],
-		['Cancel','⌘w','performClose:'],
-		['Cancel','⌘q','performClose:'],
-		['DevTools','⌘⌥i',function(){win.isDevToolsOpen()? win.closeDevTools() : win.showDevTools()}],
-		['DevTools','⌘;',function(){win.isDevToolsOpen()? win.closeDevTools() : win.showDevTools()}],
-		])],
-	['$EDIT_MENU',null,menu(null,[
-		['$EDIT_UNDO', '⌘z', 'undo:'],
-		['$EDIT_REDO', '⌘⇧z', 'redo:'],
-		['$CUT', '⌘x', 'cut:'],
-		['$COPY', '⌘c', 'copy:'],
-		['$PASTE', '⌘v', 'paste:'],
-		['$EDIT_SELECT_ALL', '⌘a', 'selectAll:'],
-		])],
-	])
-
-;(function abominamacros(){
-	var rmac = global.rc.macros
-	var macros = function λ(){return typeof(rmac)==='string'? λ._ && λ.stale > now() - 5? λ._ : (λ.stale=now(),λ._=JSON.parse(global.fs(rmac).$)) : rmac}
-	var m_prev; if (rmac) (function(){if (shown) {var m = macros()
-		// if (!$('#macros').length) {m_prev=0; $('#body').append($('<table id="macros">')); $.css}
-		// if (!_.isEqual(m_prev,m)) {$('#macros').html(_.pairs(m).map(function(v){return $('<tr>').html([$('<td>').text(v[0]),$('<td>').text(v[1])])})); size_and_center()}
-		$('.tags_in').map(function(i,v){var t; if ((t=$(v).val().match(/^(.*?)(\S+) $/)) && $(v).val() !== (t=t[1]+(m[t[2]]||t[2])+'\xa0')) {tags_set(i,t); c_focus()}})
-		m_prev = m}}).every(0.2)
-	})()
-
-// less important:
-//! when adding to the top and bottom, current selection should try to stay in the same place
-//! resizing and/or moving the window flashes it white
-
-// eep:
-//! sufficiently faraway times should be longer!
-//! sufficiently nearby times could be shorter! dynamically so, even! yeah. dynamically.
-
-var C = function(v){var id; var c = v.split(' ').filter(function(v){var t; if (t=v.match(/^#(.*)/)) id = t[1]; return !t}).join(' '); return (id?' id="'+id+'"':'')+(c!==''?' class="'+c+'"':'')}
-var S = function(c){return $('<span'+C(c)+'>')}
-var Key = function(v){return S('key').html(v)}
-
-win.size_and_center = function(op){op=op||{}; var yb; var xw; var yw
-	this.setResizable(true)
-	this.resizeTo(xw=$('#body').width()+16,yw=Math.min(yb=$('#body').height()+16,Math.round(xw*1.5)))
-	if (op.tall) {this.setMinimumSize(xw,20); this.setMaximumSize(xw,yb)} else this.setResizable(false)
-	this.moveTo(Math.round((window.screen.width-xw)/2),Math.round((window.screen.height-yw)/2)) }
-var size_and_center = function(){win.size_and_center({tall:$('#body').hasClass('editor_multi')})}
-
-var c_first = function(){return $('#body').hasClass('editor_single')? $('.tags_in') : $('#tag_editor > *').first()}
-var c_set = function(v){if (v!==cur) {cur&&cur.removeClass('curr_line'); cur = v; cur.addClass('curr_line'); ditto_o_set()}}
-var c_line = function(){return cur.is($('#submit'))? undefined : cur.find_self('.tags_in')}
-var c_get_next = function(){var t; return cur.is($('#submit'))? c_first()                   : (t=cur.next()).length? t : $('#submit')}
-var c_get_prev = function(){var t; return cur.is($('#submit'))? $('#tag_editor > *').last() : (t=cur.prev()).length? t : $('#submit')}
-var c_next = function(){c_set(c_get_next()); c_focus(); return false}
-var c_prev = function(){c_set(c_get_prev()); c_focus(); return false}
-var c_focus = function(){((t=cur.find_self('input')).length? t : cur).focus()}
-var c_at_end = function(){return cur.is($('#submit')) || $('#body').hasClass('editor_single')}
-
-var c_focus_some_always = function(){
-	c_focus()
-	$(window).on('click',c_focus)
-	if ($('#body').hasClass('editor_single')) $('.tags_in').on('click',function(e){e.stopPropagation()})
-	else $('#tag_editor').on('click','li',function(e){e.stopPropagation(); c_set($(this)); c_focus()})
-	}
-
-var single_ditto = function(e){if (prev_ping&&prev_ping.tags!=='') {e.preventDefault(); tags_set(cur.index(),global.tags_union(c_line().val(),prev_ping.tags)); return_and_close()}}
-var multi_ditto = function(e){e.preventDefault(); if (c_at_end()) return_and_close(); else {var prev = [prev_ping].concat(pings).slice(0,cur.index()+1).reverse().find(function(v){return v.tags!==''}); if (prev) tags_set(cur.index(),global.tags_union(c_line().val(),prev.tags)); c_next()}}
-
-var ping_in = function(co,v){var t=$('<input class="tags_in">'); t.val(v.tags); return $('<div'+C(co)+'>').html(t)}
-var ping_li = function(v){return $('<li>').html([S('time time-row').html(moment(v.time).format('HH:mm:ss')),ping_in('tags_in_li',v)])}
-
-$(document).on('input','.tags_in',function(){pings[cur.index()].tags = $(this).val()})
-var tags_set = function(i,v){$('.tags_in').eq(i).val(v); pings[i].tags = v}
-
-var future    = function(v){return v.time > now()}
-var late      = function(v){return Math.abs(now()-v.time) > 20}
-var very_late = function(v){return Math.abs(now()-v.time) > 86400/3}
-
-var build_single_editor = function(){
-	var v = pings[0]
-	$('body').html($('<div id="body" class="editor_single">').html([
-		$('<p>').html(["It's tag time! What ",late(v)? $('<em>').text(future(v)?'are':'were') : 'are',' you doing RIGHT ',late(v)?'AT':'NOW',' ',S('time').html(moment(v.time).format((very_late(v)?'YYYY-MM-DD/':'')+'HH:mm:ss')),'?']),
-		$('<p id="ditto_o">').html([Key("'"),' to repeat previous tags: ',$('<button id="ditto" class="inline tagstr">')]),
-		ping_in('#tag_editor',v),
-	]))
-
-	cur = c_first()
-	c_focus_some_always()
-	prev_ping_set(prev_ping)
-
-	$('.tags_in').on_key('↩',function(){if (cur.val()!=='') return_and_close(); return false})
-	$('.tags_in').on_key('⇥',function(){return false})
-	$('.tags_in, #submit').on_key('↑',function(){ping_unshift_if(); return false})
-	$('#ditto').on('click',single_ditto)
-	$('.tags_in, #submit').on_key('\'',single_ditto)
-
-	size_and_center() }
-var build_multi_editor = function(){var t
-	if (pings.length > 300 && confirm("oh dear, we're about to try to load "+pings.length+' ping boxes. Quit?'))
-		{alert('Quitting!'); win.close(); return}
-
-	$('body').html($('<div id="body" class="editor_multi">').html([
-		$('<p>').html("It's tag times! What were you doing RIGHT AT these times?"),
-		$('<p>').html([Key("'"),' to repeat previous tags',$('<span id="ditto_o">').html([': ',$('<button id="ditto" class="inline tagstr">')])]),
-		$('<ol id="tag_editor">').html(pings.map(ping_li)),
-		$('<button id="submit">').text('submit all'),
-	]))
-
-	c_set(c_first())
-	c_focus_some_always()
-	prev_ping_set(prev_ping)
-
-	$('#tag_editor').on_key('↩','.tags_in',c_next)
-	$('#tag_editor').on_key('⇥','.tags_in',c_next)
-	$('#tag_editor').on_key('↓','.tags_in',c_next)
-	$('#submit').on_key('⇥',c_next)
-	$('#submit').on_key('↓',c_next)
-
-	$('#submit').on('click',return_and_close)
-	$('#tag_editor').on_key('↑','.tags_in',t=function(){if (cur.is(c_first())) ping_unshift_if(c_prev); else c_prev(); return false})
-	$('#submit').on_key('↑',t)
-	$('#ditto').on('click',multi_ditto)
-	$('#tag_editor').on_key('\'','.tags_in',multi_ditto)
-	$('#submit').on_key('\'',multi_ditto)
-
-	size_and_center() }
-
-var ping_push = function(v,begin){lock.readLock('gui',function(rel){
-	pings[begin? 'unshift' : 'push'](v)
-	if (shown) {
-		if (pings.length===2) {$('body').html(''); build_multi_editor()}
-		else {$('#tag_editor')[begin? 'prepend' : 'append'](ping_li(v)); size_and_center()} }
-	rel()})}
-var ping_unshift = function(v){ping_push(v,true)}
-
-var ping_unshift_if = function(cb){lock.readLock('gui',function(rel){
-	if (prev_ping) {ping_unshift(prev_ping); prev_ping_set(undefined); fetch_prev_ping()}
-	rel(); cb&&cb()})}
-
-var prev_ping_set = function(v){prev_ping = v; if (shown) {if (v) $('#ditto').text(v.tags); ditto_o_set()}}
-
-var ditto_o_set = function(){prev_ping&&prev_ping.tags!=='' && cur.is(c_first())? $('#ditto_o').show() : $('#ditto_o').hide()}
-
-var fetch_prev_ping = function(cb){if (prev_ping===undefined && ping_before) ping_before(pings[0].time,function(ping){if (ping) ping.tags=ping.tags||''; prev_ping_set(ping||null); cb&&cb()}); else cb&&cb()}
-
-var build_gui = function(cb){lock.writeLock('gui',function(rel){
-	shown = true
-	if (pings.length===0) err('‽')
-	pings.length===1? build_single_editor() : build_multi_editor()
-	rel(); cb&&cb()})}
-
-var beep = function(){if (shown) new Audio(global.fs(global.rc.ping_sound).realpath()).play()}
-
-var return_and_close = function(canceled){try {
-	done = true
-	win.close(true)
-	global.win.setShowInTaskbar(false)
-	if (canceled===true) pings.forEach(function(v){v.tags = global.tags_union(v.tags,'canceled')})
-	return_cb(null,pings)
-	} catch (e) {win.close(true); global.win.setShowInTaskbar(false); return_cb(e); throw e} }
-
-win.on('close',function(){return_and_close(true)})
-
-$(window).mouseenter(win.showf)
-
-poll(function(){return win.init_cb},function(e,cb){cb(null,{
-	ping:function(ping){if (!done) {beep(); ping.tags=ping.tags||''; ping_push(ping); return true}},
-	ping_before:function(f){ping_before = f},
-	show:function(cb){return_cb = cb; fetch_prev_ping(function(){build_gui(function(){beep(); global.win.setShowInTaskbar(true); win.showf.in(0.2)})})},
-	}) })
-
-</script>
+</body></html>

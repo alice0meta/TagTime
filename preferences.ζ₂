@@ -1,0 +1,28 @@
+global.$ = require('jquery')
+
+shell ← require('shell')
+remote ← require('remote')
+clip ← require('clipboard')
+rc_ ← remote.require('./aux').rc_
+
+show ← λ(){remote.getCurrentWindow().show(); remote.getCurrentWindow().focus()}
+webContents ← remote.getCurrentWindow().webContents
+
+global.write = λ(v){document.write(v)}
+
+global.external_link = λ(url,text){
+	id ← url.replace(/\W/g,'')
+	write('<a id="'+id+'" class="external" href="'+url+'">'+text+'</a>')
+	$('#'+id).click(λ(){shell.openExternal(url); ↩ false})
+	}
+
+$(λ(){
+	$('#period').val(rc_('.period')); $('#period').on('input',λ(){rc_('.period',parseInt($('#period').val()))})
+	$('#auth\\.beeminder').val(rc_('.auth.beeminder')); $('#auth\\.beeminder').on('input',λ(){rc_('.auth.beeminder',$('#auth\\.beeminder').val())})
+})
+
+webContents.on('did-finish-load',show)
+
+// clip.readText() -> string ... and then eventually: ping_file.events.emit('=')
+// clip.writeText(<string>)
+// 'tagtime '+fs(process.env.HOME).name()+' '+moment().toString()+'.log'

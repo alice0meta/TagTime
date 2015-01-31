@@ -1,0 +1,76 @@
+we've gotten all the project structure set up
+we gotta build ζ₂ and make it dev- and deployment- friendly. it'll just translate λ ← ↩ in javascript files into function var return
+now we figure out how to run and make things with atom-shell https://github.com/atom/atom-shell/tree/master/docs
+NEXT:
+and then we atom-shell-ify the existing code
+also we figure out how to make Applications persistent and note that non-OSX isn't
+
+?? auto update with
+https://github.com/atom/atom-shell/blob/master/docs/api/auto-updater.md
+
+?? manage multiple screens with
+require('screen').getPrimaryDisplay()
+
+⎋ ⌘w ⌘q should all do action Cancel
+
+------------------------------------- todo -------------------------------------
+
+bah, fuck, i ate my timezone information again. fix?
+people who don't use tagtime all the time want "only run during certain hours" and "don't bother logging afk/canceled pings" modes
+handle being pinged while you're typing
+i think it should be super explicit like "your computer seems to be bogged down". usually that will have been painfully obvious to you which is actually reassuring for tagtime to notice and warn you and tell you exactly why. and if it ever happens for no apparent reason then it would probably be good to get a bug report about that - how about "This ping is $x seconds late! If this doesn't seem like your computer's fault you can _submit a bug report_ [link]."
+"i think macro expansion in tagtime should be on enter as well as on space"
+ooh, we maybe need to handle dropbox-style logfile syncing? that means killing ping windows if the log file updates with those pings - that is, always pinging just those pings which the log file is missing.
+
+---------- todo back ---------
+
+concurrency oh god
+verify we've got a valid auth token for the user we're trying to interact with (this especially handles the case in which the username is mistyped)
+have read_graph cache its results
+‽ implement "In the future this should show a cool pie chart that lets you click on the appropriate pie slice, making that slice grow slightly. And the slice boundaries could be fuzzy to indicate the confidence intervals! Ooh, and you can drag the slices around to change the order so similar things are next to each other and it remembers that order for next time! That's gonna rock."
+   so, when i took five minutes to consider "what would be a *good* interface for tagging?", i thought of "what about a field of 2-dimensional tag-cells, with size proportional to frequency, that can be persistently dragged around?"
+maybe prepare the gui beforehand so that we can make it come up on exactly the right instant?
+tagtime should definitely have an interface that lives in the system tray
+email tagtime? for ios, until we properly deploy to ios?
+it's too easy to let a ping window get lost - see if atom-shell gives access to stuff we could use to fix this
+	"(@alice, in case this is an easy fix: i drag the tagtime prompt to secondary screen and leave it there. on next ping it jumps to the corresponding place on primary screen. better if it didn't move on you)"
+"eep! I think you scrolled up!" is silly; handle that sanely
+generate_actions has a horrifyingly inefficient O(n²) algorithm. rewrite that!
+be sure to display datetimes in human ways, incl being dynamically aware of the current time.
+make sure the interface moves up and down in the correct ways when its size changes
+do make sure the tag functions don't chew up (comments)
+fix up the readme
+oh dear, ζtt is _not_ very window-sanitary. dependency: work on ζ₀
+check if the graph is do-more or do-less and do the uploading order accordingly
+annoying person: https://mail.google.com/mail/u/0/#all/1475525cc89fff4f
+happy malo: https://mail.google.com/mail/u/0/#all/1486610d171b5c4b
+sms would make money: https://mail.google.com/mail/u/0/#all/14b1dcb399f77201
+some people *really* want this: Cost to commission TagTime iOS app? https://mail.google.com/mail/u/0/#all/149c0690dc6ce24c
+
+----------------------------- deploy target roadmap ----------------------------
+
+. windows
+~ osx
+o linux
+. ?webapp?
+o android
+. ios
+
+------------------ todo sometime eventually if we feel like it -----------------
+
+expand reset_before to make ping_seq faster to start up
+instead of ignoring non-parsed beeminder graph pings, zero them and annotate the comment - like, 28 1 "foo" → 28 0 "foo (was 1; zeroed by tagtime syncing)"
+add an interface to export an existing graph as a pingfile and/or to your existing pingfile
+expand the datapoint comment so the (subset which is being tracked of) the pingfile can be fully recovered from the beeminder graphs
+a future "advanced settings" thing maybe. like "keep my system clock mercilessly in sync with ntp.org" or whatever - /usr/sbin/ntpdate pool.ntp.org
+malcolm says: "tagtime integration with pebble"
+btw, we should have a logfile. and maybe make it work for everything (install script, etc) not just the clogs?
+* TagTime could be a better way for lawyers et al to bill time to projects.
+* We can of course reimplement rescuetime. We can also poll for other kinds of data, like specific-computer, is-network-connected, wifi-SSID, external devices interacting, microphone loud-quiet, camera bright-dark, typing, gps
+	require('power-monitor').on('suspend', λ(){console.log('The system is going to sleep')})
+	require('power-monitor').on('resume', λ(){console.log('The system has woken up from sleep')})
+* Figure out the confidence intervals based on the samples (pie slices could have fuzzy boundaries to indicate confidence intervals).
+* Badge/widget for your website with your time pie.
+* Thoughts on visualization: http://stackoverflow.com/questions/3224494/data-visualization-bubble-charts-venn
+Convention: When introducing a new tag, define it with a parenthetical in your response to the ping the first time you use it.  Eg, if you decide to create a new tag "mtg" for time spent in meetings then answer the first such ping with something like "job nyc mtg (mtg: in a meeting)".
+https://www.facebook.com/mqrius/posts/10152823173381168

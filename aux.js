@@ -1,31 +1,27 @@
-require('./ζtt.js')
-var http = require('http')
+require("zeta-two");var http = require('http')
 var https = require('https')
+var EventEmitter = require('events').EventEmitter
+var app = require('app')
 
-global.clog = function(){return print.apply(null,[moment()].concat(A(arguments)))}
+var R = module.exports
 
-var tags_split = function(v){return v.trim().split(/ +/)}
-var tags_join = function(v){return v.join(' ').trim()}
-global.tags_norm = function(v){return tags_join(tags_split(v))}
-global.tags_union = function(){return tags_join(_.union.apply(_,A(arguments).map(tags_split)))}
+var clog = R.clog = function(){return print.apply(null,[moment()].concat(ζ2_A(arguments)))}
 
-lazy(global,'rc',function(){
-	var f_settings = process.env.TTSETTINGS || '~/TagTime/settings.json'
-	if (!fs(f_settings).exists()) {
-		fs(f_settings).$ = (fs('settings.js').$+'').replace(/‹([^›]+)›/g,function(_,v){var t; return is(t=eval(v))?t:''})
-		print("hey, I've put a settings file at",f_settings,'for you. Go fill it in!')
-		global.gui.Shell.openItem(fs(f_settings).realpath()) }
-	try {var r = JSON.parse((fs(f_settings).$+'').replace(/\/\/.*/g,''))}
-	catch (e) {print('ERROR: bad rc file -',e); return undefined}
-	_.defaults(r,{ping_sound:'loud-ding.wav'})
-	if (!fs(r.ping_file).exists()) fs(r.ping_file).$ = ''
-	return r})
+var JsonFile = {'$':function(){return JSON.parse(fs(this).$)}, '=':function(v){fs(this).$ = JSON.stringify(v,null,'\t')},}
+var rc = R.rc = fs(app.getDataPath()).join('settings.json').as_type(JsonFile)
+if (!rc.exists()) rc.$ = {period:45, ping_sound:'loud-ding.wav', auth:{}}
+
+R.rc_ = function(q,v){
+	// atom-shell remote is weird, so have a hack to make things work anyway
+	if (v === undefined) {return eval('rc.$'+q)}
+	else {var t = rc.$; eval('t'+q+' = v'); rc.$ = t} }
 
 // less hacky hacky partial beeminder api
+// !! this is what i wanted method_missing for
 var request = function(method,path,query,headers,cb){
 	var t = path.match(/^(https?):\/\/(.*)$/); var http_ = t[1] === 'http'? http : https; path = t[2]
 	var t = path.match(/^(.*?)(\/.*)$/); var host = t[1]; path = t[2]
-	query = seq(query).map(function(v){return encodeURIComponent(v[0])+'='+encodeURIComponent(v[1])}).join('&')
+	query = _(query).pairs().map(function(v){return encodeURIComponent(v[0])+'='+encodeURIComponent(v[1])}).join('&')
 	path = path+(query===''?'':'?'+query)
 	clog('REQUEST',method,host+path)
 	http_.request({host:host,path:path,headers:headers,method:method},function(resp){
@@ -33,9 +29,9 @@ var request = function(method,path,query,headers,cb){
 			t = t.join('')
 			try {var json = JSON.parse(t)} catch (e) {var err = e}
 			cb(err,{json:json,string:t,response:resp}) }) }).end() }
-global.beeminder = function(v){var a = arguments; var cb = a[a.length-1]; var arg = a.length > 2? a[1] : undefined
+R.beeminder = function(v){var a = ζ2_A(arguments).slice(1); var cb = a.pop(); var arg = a[0]
 	var base = 'https://www.beeminder.com/api/v1/'
-	var auth = {auth_token:rc.beeminder.auth}
+	var auth = {auth_token:rc.$.auth.beeminder}
 	var t0 = cb; cb = function(e,v){if (!e && (v.error || (v.errors && v.errors.length > 0))) t0(v.error||v.errors,v); else t0(e,v)}
 	var t1 = cb; cb = function(e,v){t1(e, e? v : v.json)}
 	var ug = v.match(/^(.+)\/(.+)$/)
@@ -50,53 +46,54 @@ global.beeminder = function(v){var a = arguments; var cb = a[a.length-1]; var ar
 	else request('GET',base+'users/'+ug[1]+'/goals/'+ug[2]+'.json',auth,{},cb)
 	}
 
-// parser and stringifier
-global.ping_file = (function(){
-	// log format is: 2014-03-26/19:51:56-07:00‹p22.5›? a b c (a: comment)
-	var dt_fmt = 'YYYY-MM-DD/HH:mm:ssZ'
-	var parse = function(v){
-		if (v.match(/^....-/)) {var t = v.match(/^([^\sp]+)(p\S+)? (.*)$/); return {time:moment.utc(t[1],dt_fmt)+0, period:t[2]? parseFloat(t[2]) : 45, tags:t[3].trim()}}
-		else {var t = v.match(/^(\d+)([^\[]+)/); if (!t) err('bad log file'); return {time:i(t[1]), period:rc.period, tags:t[2].trim()}}
-		}
-	var stringify = function(v){return moment(v.time).format(dt_fmt)+(v.period===45?'':'p'+v.period)+' '+v.tags}
-	var read_nonblank_lines = function(fl){return fs(fl).$.split('\n').filter(function(v){return v!==''})}
-	var r = function(fl){this.fl = fl}
-		.def('$',function(){return read_nonblank_lines(this.fl).map(parse)},
-			function(v){fs(this.fl).$ = v.map(stringify).join('\n')+'\n'; return this})
-	r.prototype.append = function(v){fs(this.fl).append(stringify(v)+'\n'); return this}
-	return function(fl){return new r(fl)}})()
-
-lazy(global,'ping_seq',function(){return (function(period){
+R.ping_seq = (function(){
 	var epoch = {seed:666, time:1184083200} // the birth of timepie/tagtime!
 	var ping_next = function(ping){ // see p37 of Simulation by Ross
 		ping.seed = pow(7,5)*ping.seed % (pow(2,31)-1) // ran0 from Numerical Recipes
 		ping.time += round(max(1,-45*60*log(ping.seed / (pow(2,31)-1)))) }
-	var keep = function(v){return !v.fraction || bit_reverse_i(31,v.seed) / (pow(2,31)-1) <= v.fraction}
-	var next_s = function(v){var existing = seqs._.pluck('time'); do {ping_next(v)} while (!keep(v)); while (existing._.contains(v.time)) v.time += 1; return v}
+	var keep = function(v){return !v.fraction || ζ2_bit_reverse_i(31,v.seed) / (pow(2,31)-1) <= v.fraction}
+	var next_s = function(v){var existing = seqs._.map('time'); do {ping_next(v)} while (!keep(v)); while (existing._.contains(v.time)) v.time += 1; return v}
 	
-	var seqs = []
-	var reset_before = function(time){if (!seqs || !seqs.length || time < getv()) {
+	var seqs;
+	var period;
+	var ensure_before = function(time){if (period !== (period=rc.$.period) || !seqs || time < getv()) {
 		var n = 45 / period
-		seqs = _.range(ceil(n)).map(function(v){var t = _.clone(epoch); t.seed += v; return t}).map(next_s)
+		seqs = _.range(ceil(n)).map(function(v){var t = _(epoch).clone(); t.seed += v; return t}).map(next_s)
 		if (ceil(n)-n !== 0) seqs[-1].fraction = 1-(ceil(n)-n)
 		}}
-	var getv = function(){return seqs._.min(function(v){return v.time}).time}
+	var getv = function(){return seqs._.min('time').time}
 	var get = function(){return {time:getv(), period:period}}
-	var next = function(){next_s(seqs._.min(function(v){return v.time}))}
-	
-	reset_before(now())
-	return ζ0_def({
-		le: function(time){reset_before(time); while (true) {var t = _.jclone(seqs); next(); if (getv() > time) {seqs = t; break}}; return get()},
-		next: function(){next(); return get()},
-		}, '0', function(){return get()}
-	) })(rc.period)})
+	var next = function(){next_s(seqs._.min('time'))}
 
-global.cmp_versions = function(cb){
-	var version_lt = function(a,b){a=a.split('.').map(i); b=b.split('.').map(i); return a[0]<b[0] || (a[0]===b[0] && (a[1]<b[1] || (a[1]===b[1] && a[2]<b[2])))}
-	var local = JSON.parse(fs('package.json').$)
-	exec("curl -L '"+'https://raw.github.com/'+local.repository.url.match(/^https:\/\/github.com\/([\w-]+\/[\w-]+)\.git$/)[1]+'/master/package.json'+"'",function(e,v){var canon;
-		if (v!=='' && (canon = JSON.parse(v), version_lt(local.version,canon.version))) cb(null,local.version+' → '+canon.version)
-		else cb()
-	}) }
+	return {
+	le: function(time){ensure_before(time); while (true) {var t = ζ2_jsonclone(seqs); next(); if (getv() > time) {seqs = t; break}}; return get()},
+	gt: function(time){le(time); next(); return get()},
+	} })()
 
-global.update = function(cb){exec('bash -c "eval $(curl -fsSL https://raw.github.com/alice0meta/TagTime/master/install.sh)"',cb)}
+var PingFile = (function(){
+	var dt_fmt = 'YYYY-MM-DD/HH:mm:ssZ' // log format is: 2014-03-26/19:51:56-07:00‹p22.5›? a b c (a: comment)
+	var parse = function(v){var t;
+		if (v.match(/^....-/)) {
+			var t = v.match(/^([^\sp]+)(p\S+)? (.*)$/); var tags = t[3].trim()
+			return _({time:moment.utc(t[1],dt_fmt)+0, period:t[2]? parseFloat(t[2]) : 45}).extend(tags === '<unanswered>'? {} : {tags:tags}) }
+		else if (t=v.match(/^(\d+)([^\[]+)/)) return {time:ζ2_i(t[1]), period:rc.$.period, tags:t[2].trim()}
+		else err('bad log file') }
+	var stringify = function(v){return moment(v.time).format(dt_fmt)+(v.period===45?'':'p'+v.period)+' '+(v.tags!==undefined&&v.tags!==null? v.tags : '<unanswered>')}
+	return { // be careful about adding more mutators here - it's a bit fragile. (it might screw up prompt.ζ₂)
+	'$':function(){return this.lines().map(parse)},
+	'=':function(v){fs(this).$ = v.map(stringify).join('\n')+'\n'; return v},
+	push:function(v){this.events.emit('push'); this.ensure_eof_nl().append(stringify(v)+'\n'); return this},
+	set:function(i,v){var t = this.lines(); this.splice(Buffer.byteLength(t.slice(0,i).join('\n')),Buffer.byteLength(t[i<0?i+t.length:i]+'\n'),stringify(v)+'\n')},
+	} })()
+var ping_file = R.ping_file = fs(app.getDataPath()).join('pings.log').as_type(PingFile)
+ping_file.events = new EventEmitter()
+
+// global.cmp_versions = function(cb){
+// 	var version_lt = function(a,b){a=a.split('.').map(i); b=b.split('.').map(i); return a[0]<b[0] || (a[0]===b[0] && (a[1]<b[1] || (a[1]===b[1] && a[2]<b[2])))}
+// 	var local = JSON.parse(fs('package.json').$)
+// 	child_process.exec("curl -L '"+'https://raw.github.com/'+local.repository.url.match(/^https:\/\/github.com\/([\w-]+\/[\w-]+)\.git$/)[1]+'/master/package.json'+"'",function(e,v){var canon;
+// 		if (v!=='' && (canon = JSON.parse(v), version_lt(local.version,canon.version))) cb(null,local.version+' → '+canon.version)
+// 		else cb()
+// 	}) }
+
+// global.update = function(cb){child_process.exec('bash -c "eval $(curl -fsSL https://raw.github.com/alice0meta/TagTime/master/install.sh)"',cb)}

@@ -1,0 +1,78 @@
+t←require('./aux'); ping_file ← t.ping_file; clog ← t.clog; beeminder ← t.beeminder
+async ← require('async')
+
+pluralize ← λ(n,noun){↩ n+' '+noun+(n===1?'':'s')}
+
+// beeminder api datapoints → [{time: period: tags: id: group:}]
+beeminder_pings ← λ(datapoints){↩ datapoints.filter(λ(v){↩ v.value!==0 && v.comment.match(/pings?:/)}).map(λ(v){
+	pings ← v.comment.match(/pings?:(.*)/)[1].trim().replace(/ \[..:..:..\]$/,'').split(', ')
+	r ← pings.map(λ(t){↩ {time:v.timestamp, period:v.value*60/pings.length, tags:t, id:v.id}})
+	r.map(λ(v){v.group = r})
+	↩ r})._.flatten(true)._.sortBy('time') }
+
+// tagdsl_eval ← λ(f,tags){t←;
+// 	tags = tags.replace(/\(.*?\)/g,' ').trim().split(/ +/)
+// 	check ← λ(v){↩ _.contains(tags,v)}
+// 	↩ f instanceof Array? f.every(check) : f.slice(0,2)==='! '? !check(f.slice(2)) : f.split(' ').some(check) }
+
+generate_actions ← λ(user_slug,f_pings,b_pings){t←;
+	f_pings = f_pings._.sortBy('time')
+	b_pings = b_pings._.sortBy('time')
+	f_pings.map(λ(v){v.group_time = round(v.time/86400 - 2/3)*86400 + 86400*2/3})
+	b_pings.map(λ(v){v.group_time = round(v.time/86400 - 2/3)*86400 + 86400*2/3})
+	if (b_pings.some(λ(v){↩ v.group_time!==v.time})) {print('ERROR: so confused'); err('‽')}
+
+	hash ← λ(v){↩ v.group_time+':::'+v.tags+':::'+v.period}
+	bt ← b_pings._.groupBy(hash); f_pings.map(λ(fv){t ← hash(fv); if (bt[t]) {fv.matched = true; bt[t][0].matched = true; delete(bt[t][0])}})
+	add_pings ←  f_pings.filter(λ(v){↩ !v.matched}); add_pings.map(λ(v){v.add = true})
+	kill_pings ← b_pings.filter(λ(v){↩ !v.matched}); kill_pings.map(λ(v){v.kill = true})
+
+	actions ← _(add_pings.concat(b_pings)._.groupBy(λ(v){↩ v.group_time+' '+v.period})).values().map(λ(v){
+		if (!v.some(λ(v){↩ v.add || v.kill})) // no change
+			↩ undefined
+		else if (v.every(λ(v){↩ v.add})) // log and ¬bee: CREATE
+			↩ [['CREATE',{timestamp:v[0].group_time, value:v.length*v[0].period/60, comment:pluralize(v.length,'ping')+': '+v._.pluck('tags').join(', ')}]]
+		else if (v.every(λ(v){↩ v.kill})) // ¬log and bee: DELETE
+			↩ v.map(λ(v){↩ ['DELETE',{timestamp:v.time,id:v.id}]})
+		else { // log and bee: UPDATE?
+			t ← _(v.filter(λ(v){↩ !(v.add || v.kill)})._.groupBy('id')).values()
+			v = v.concat(t.slice(1)._.flatten(true).map(λ(v){v.kill = true; ↩ {add:true, group_time:v.group_time, period:v.period, tags:v.tags}}))
+			set ← v.filter(λ(v){↩ !v.kill})
+			kill ← v.filter(λ(v){↩ v.kill})
+			id ← t.length===0? kill[0].id : t[0][0].id
+			↩ [['UPDATE',id,{timestamp:v[0].group_time, value:set.length*v[0].period/60, comment:pluralize(set.length,'ping')+': '+set._.pluck('tags').join(', ')},set.length-kill.length]].concat(kill.filter(λ(v){↩ v.id!==id}).map(λ(v){↩ ['DELETE',{timestamp:v.time,id:v.id}]}))
+		} }).filter(λ(v){↩ v})._.flatten(true)
+	actions = actions._.groupBy(0)
+	CREATE ← (actions.CREATE||[])._.pluck(1)
+	UPDATE ← (actions.UPDATE||[])
+	DELETE ← (actions.DELETE||[])._.pluck(1)._.uniq('id')
+	ymd ← λ(v){↩ moment(v.timestamp).utc().format('YYYY-MM-DD')}
+	↩ {
+		msgs: [
+			CREATE.map(λ(v){↩ 'BEE_SYNC + '+user_slug+' '+ymd(v)+' '+v.comment}),
+			UPDATE.map(λ(v){↩ 'BEE_SYNC = '+user_slug+' '+ymd(v[2])+' '+v[2].comment}),
+			DELETE.map(λ(v){↩ 'BEE_SYNC - '+user_slug+' '+ymd(v)+' '+v.id}),
+			]._.flatten(true),
+		cmds: [
+			CREATE.length? [[user_slug+'.datapoints *=',CREATE]] : [],
+			UPDATE._.sortBy(3).map(λ(v){↩ [user_slug+'.datapoints['+v[1]+'] =',v[2]]}),
+			DELETE.map(λ(v){↩ [user_slug+'.datapoints['+v.id+'] =']}),
+			]._.flatten(true),
+		} }
+
+sync_bee ← λ(args,cb){
+	async.parallelLimit(_(rc.$.beeminder).pairs().map(λ(t){user_slug←t[0]; tagstr←t[1]; ↩ λ(cb){
+		beeminder(user_slug+'.datapoints',λ(e,v){if (e) cb(e,v); else {
+			cb(null,generate_actions(
+				user_slug,
+				ping_file.$.filter(λ(v){↩ tagdsl_eval(tagstr,v.tags)})._.sortBy('time'),
+				beeminder_pings(v)))
+				}}) }}),
+		10,
+		λ(e,action_sets){
+			action_sets._.pluck('msgs')._.flatten(true).map(λ(v){clog(v)})
+			if (!args.dry) async.parallelLimit(action_sets._.pluck('cmds')._.flatten(true).map(λ(v){↩ λ(cb){beeminder.apply(null,v.concat([cb]))}}),10,cb)
+			else cb&&cb.in()
+		} ) }
+
+module.exports = λ(args,cb){clog('SYNC'); sync_bee(args||{},cb)}

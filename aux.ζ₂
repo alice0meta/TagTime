@@ -1,0 +1,99 @@
+http ← require('http')
+https ← require('https')
+EventEmitter ← require('events').EventEmitter
+app ← require('app')
+
+R ← module.exports
+
+clog ← R.clog = λ(){↩ print.apply(null,[moment()].concat(ζ2_A(arguments)))}
+
+JsonFile ← {'$':λ(){↩ JSON.parse(fs(@).$)}, '=':λ(v){fs(@).$ = JSON.stringify(v,null,'\t')},}
+rc ← R.rc = fs(app.getDataPath()).join('settings.json').as_type(JsonFile)
+if (!rc.exists()) rc.$ = {period:45, ping_sound:'loud-ding.wav', auth:{}}
+
+R.rc_ = λ(q,v){
+	// atom-shell remote is weird, so have a hack to make things work anyway
+	if (v === undefined) {↩ eval('rc.$'+q)}
+	else {t ← rc.$; eval('t'+q+' = v'); rc.$ = t} }
+
+// less hacky hacky partial beeminder api
+// !! this is what i wanted method_missing for
+request ← λ(method,path,query,headers,cb){
+	t ← path.match(/^(https?):\/\/(.*)$/); http_ ← t[1] === 'http'? http : https; path = t[2]
+	t ← path.match(/^(.*?)(\/.*)$/); host ← t[1]; path = t[2]
+	query = _(query).pairs().map(λ(v){↩ encodeURIComponent(v[0])+'='+encodeURIComponent(v[1])}).join('&')
+	path = path+(query===''?'':'?'+query)
+	clog('REQUEST',method,host+path)
+	http_.request({host:host,path:path,headers:headers,method:method},λ(resp){
+		t ← []; resp.on('data',λ(chunk){t.push(chunk)}); resp.on('end',λ(){
+			t = t.join('')
+			try {json ← JSON.parse(t)} catch (e) {err ← e}
+			cb(err,{json:json,string:t,response:resp}) }) }).end() }
+R.beeminder = λ(v){a ← ζ2_A(arguments).slice(1); cb ← a.pop(); arg ← a[0]
+	base ← 'https://www.beeminder.com/api/v1/'
+	auth ← {auth_token:rc.$.auth.beeminder}
+	t0 ← cb; cb = λ(e,v){if (!e && (v.error || (v.errors && v.errors.length > 0))) t0(v.error||v.errors,v); else t0(e,v)}
+	t1 ← cb; cb = λ(e,v){t1(e, e? v : v.json)}
+	ug ← v.match(/^(.+)\/(.+)$/)
+	ugd ← v.match(/^(.+)\/(.+)\.datapoints$/)
+	ugdc ← v.match(/^(.+)\/(.+)\.datapoints \*=$/)
+	ugdu ← v.match(/^(.+)\/(.+)\.datapoints\[(.+)\] =$/)
+	if (!ug) request('GET',base+'users/'+v+'.json',auth,{},cb)
+	else if (ugd) request('GET',base+'users/'+ugd[1]+'/goals/'+ugd[2]+'/datapoints.json',auth,{},cb)
+	else if (ugdc) request('POST',base+'users/'+ugdc[1]+'/goals/'+ugdc[2]+'/datapoints/create_all.json',merge_o(auth,{datapoints:JSON.stringify(arg)}),{},cb)
+	else if (ugdu && arg) request('PUT',base+'users/'+ugdu[1]+'/goals/'+ugdu[2]+'/datapoints/'+ugdu[3]+'.json',merge_o(auth,arg),{},cb)
+	else if (ugdu && !arg) request('DELETE',base+'users/'+ugdu[1]+'/goals/'+ugdu[2]+'/datapoints/'+ugdu[3]+'.json',auth,{},cb)
+	else request('GET',base+'users/'+ug[1]+'/goals/'+ug[2]+'.json',auth,{},cb)
+	}
+
+R.ping_seq = (λ(){
+	epoch ← {seed:666, time:1184083200} // the birth of timepie/tagtime!
+	ping_next ← λ(ping){ // see p37 of Simulation by Ross
+		ping.seed = pow(7,5)*ping.seed % (pow(2,31)-1) // ran0 from Numerical Recipes
+		ping.time += round(max(1,-45*60*log(ping.seed / (pow(2,31)-1)))) }
+	keep ← λ(v){↩ !v.fraction || ζ2_bit_reverse_i(31,v.seed) / (pow(2,31)-1) <= v.fraction}
+	next_s ← λ(v){existing ← seqs._.map('time'); do {ping_next(v)} while (!keep(v)); while (existing._.contains(v.time)) v.time += 1; ↩ v}
+	
+	seqs←;
+	period←;
+	ensure_before ← λ(time){if (period !== (period=rc.$.period) || !seqs || time < getv()) {
+		n ← 45 / period
+		seqs = _.range(ceil(n)).map(λ(v){t ← _(epoch).clone(); t.seed += v; ↩ t}).map(next_s)
+		if (ceil(n)-n !== 0) seqs[-1].fraction = 1-(ceil(n)-n)
+		}}
+	getv ← λ(){↩ seqs._.min('time').time}
+	get ← λ(){↩ {time:getv(), period:period}}
+	next ← λ(){next_s(seqs._.min('time'))}
+
+	↩ {
+	le: λ(time){ensure_before(time); while (true) {t ← ζ2_jsonclone(seqs); next(); if (getv() > time) {seqs = t; break}}; ↩ get()},
+	gt: λ(time){le(time); next(); ↩ get()},
+	} })()
+
+PingFile ← (λ(){
+	dt_fmt ← 'YYYY-MM-DD/HH:mm:ssZ' // log format is: 2014-03-26/19:51:56-07:00‹p22.5›? a b c (a: comment)
+	parse ← λ(v){t←;
+		if (v.match(/^....-/)) {
+			t ← v.match(/^([^\sp]+)(p\S+)? (.*)$/); tags ← t[3].trim()
+			↩ _({time:moment.utc(t[1],dt_fmt)+0, period:t[2]? parseFloat(t[2]) : 45}).extend(tags === '<unanswered>'? {} : {tags:tags}) }
+		else if (t=v.match(/^(\d+)([^\[]+)/)) ↩ {time:ζ2_i(t[1]), period:rc.$.period, tags:t[2].trim()}
+		else err('bad log file') }
+	stringify ← λ(v){↩ moment(v.time).format(dt_fmt)+(v.period===45?'':'p'+v.period)+' '+(v.tags!==undefined&&v.tags!==null? v.tags : '<unanswered>')}
+	↩ { // be careful about adding more mutators here - it's a bit fragile. (it might screw up prompt.ζ₂)
+	'$':λ(){↩ @.lines().map(parse)},
+	'=':λ(v){fs(@).$ = v.map(stringify).join('\n')+'\n'; ↩ v},
+	push:λ(v){@.events.emit('push'); @.ensure_eof_nl().append(stringify(v)+'\n'); ↩ @},
+	set:λ(i,v){t ← @.lines(); @.splice(Buffer.byteLength(t.slice(0,i).join('\n')),Buffer.byteLength(t[i<0?i+t.length:i]+'\n'),stringify(v)+'\n')},
+	} })()
+ping_file ← R.ping_file = fs(app.getDataPath()).join('pings.log').as_type(PingFile)
+ping_file.events = new EventEmitter()
+
+// global.cmp_versions = λ(cb){
+// 	version_lt ← λ(a,b){a=a.split('.').map(i); b=b.split('.').map(i); ↩ a[0]<b[0] || (a[0]===b[0] && (a[1]<b[1] || (a[1]===b[1] && a[2]<b[2])))}
+// 	local ← JSON.parse(fs('package.json').$)
+// 	child_process.exec("curl -L '"+'https://raw.github.com/'+local.repository.url.match(/^https:\/\/github.com\/([\w-]+\/[\w-]+)\.git$/)[1]+'/master/package.json'+"'",λ(e,v){canon←;
+// 		if (v!=='' && (canon = JSON.parse(v), version_lt(local.version,canon.version))) cb(null,local.version+' → '+canon.version)
+// 		else cb()
+// 	}) }
+
+// global.update = λ(cb){child_process.exec('bash -c "eval $(curl -fsSL https://raw.github.com/alice0meta/TagTime/master/install.sh)"',cb)}

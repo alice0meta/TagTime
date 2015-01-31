@@ -1,0 +1,76 @@
+app ← require('app')
+Menu ← require('menu')
+Tray ← require('tray')
+BrowserWindow ← require('browser-window')
+
+t←require('./aux'); ping_file ← t.ping_file; clog ← t.clog; ping_seq ← t.ping_seq
+tt_sync ← require('./tt_sync')
+
+//===----------------------------------------------------------------------===//
+
+avoid_gc ← (λ(){l←{}; id←0; ↩ λ(v){t←; l[t=id++] = v; ↩ {$:v, end:λ(){delete(l[t])}} } })()
+format_dur ← λ λ(v){
+	v = round(v)
+	if (v<0) ↩ '-'+λ(-v)
+	d ← floor(v/60/60/24); h ← floor(v/60/60)%24; m ← floor(v/60)%60; s ← v%60
+	↩ [d+'d',h+'h',m+'m',s+'s'].slice(d>0?0:h>0?1:m>0?2:3).join('')}
+
+open_window ← λ λ(name){
+	t ← '('+fs(name+'.html').$.match(/^<!--([\s\S]+?)-->/)[1]+')'
+	try {t = eval(t)} catch (e) {if (!(e instanceof SyntaxError)) throw e; err('bad file: '+name+'.html')}
+	args ← _(t).extend({show:false, icon:'resources/tagtime.png'})
+	if (args.unique && λ.open[name]) ↩ λ.open[name]
+	v ← new BrowserWindow(args)
+	v.loadUrl('file://'+__dirname+'/'+name+'.html')
+	v.on('closed',avoid_gc(v).end)
+	if (args.unique) {λ.open[name] = v; v.on('closed',λ(){delete(λ.open[name])})}
+	↩ v}; open_window.open = {}
+
+app.dock.hide()
+app.on('ready',λ(){
+	v ← avoid_gc(new Tray('resources/tray.png')).$
+	v.setToolTip('TagTime')
+	v.setContextMenu(Menu.buildFromTemplate([
+		{label:'Preferences', click:λ(){open_window('preferences')}},
+		{label:'Edit Pings', click:λ(){open_window('prompt')}},
+		{label:'Quit', click:app.quit},
+		]))
+	})
+
+schedule_pings ← λ(){brk←; win←;
+	ping_file.events.on('=',λ(){clog('RESET ping file changed'); cancelTimeout(brk); win&&win.close(); λ()})
+	λ←;(λ=λ λ(){t←;
+		next ← ping_seq.gt(((t=ping_file.$[-1])&&t.time) || ζ2_now())
+		brk = (λ(){
+			clog('PING for',next.time)
+			ping_file.push(next)
+			win = open_window('prompt')
+			λ() }).at(next.time)
+		})() }
+
+// require('crash-reporter').start() // report crashes to atom shell's server
+
+argv ← process.argv.slice(2)
+switch (argv[0]) {
+	default: clog('hi!'); break
+	case 'start':
+		t←; n←; clog('BEGIN last ping in sequence was',moment(t=ping_seq.le(n=ζ2_now()).time),'(',format_dur(n-t),'ago )') // should use moment durations
+		clog('SORRY update checks not implemented!')
+		schedule_pings()
+		break
+	case 'prompt':
+		// clog('SORRY prompt not implemented!')
+		app.on('ready',λ(){open_window('prompt')})
+		// t ← isNaN(ζ2_i(argv[1])); time ← t? ζ2_now() : ζ2_i(argv[1]); prev ← argv.slice(t?1:2).join(' ')
+		// open_window('prompt',λ(e,win){
+		// 	win('ping_before',λ(time,cb){cb({time:time-2000,tags:prev}); prev = time+''})
+		// 	win('ping',{time:time, period:45})
+		// 	win('show',λ(e,pings){print(pings._.map('tags').join('\n')); if (!e) process.exit()})
+		// 	})
+		break
+	// case 'repl': require('repl').start({}).context.aux = require('./aux'); break
+	case 'repl': require('repl').start({}); break
+	case 'pref': app.on('ready',λ(){open_window('preferences')}); break
+	case 'sync': tt_sync(); break
+		// if (!module.parent) sync({dry:process.argv[2]==='--dry'})
+}

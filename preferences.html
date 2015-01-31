@@ -1,0 +1,58 @@
+<!-- {
+	width:400, height:200,
+	// resizable:false,
+	'always-on-top':true,
+	'auto-hide-menu-bar':true, 'skip-taskbar':true,
+	// frame:false,
+	fullscreen:false,
+	unique:true,
+	} -->
+<!DOCTYPE html><html><head><meta charset="utf-8">
+	<title>tagtime preferences</title>
+	<style>
+		/* font and color style */
+		body {background-color:#222; color:#fff; font-family:'Helvetica Neue',sans-serif; font-size:14px;}
+
+		/* layout style */
+		.setting {display:flex; margin:1ex 0;}
+		.setting > label:first-child {min-width:150px; margin:0 5px 0 0; text-align:right;}
+		.setting input + * {display:block; margin:3px 0 0 0;}
+	</style>
+	<script>require('./'+require('path').basename(__filename,'.html'))</script>
+</head><body>
+<!-- [export pings to clipboard] [import pings from clipboard]
+import should put a backup in your tmp folder? -->
+	<div class="setting">
+		<label for="period">ping period in minutes</label>  
+		<input id="period" type="number">
+	</div>
+<!-- 	<div class="setting">
+		<label for="ping_file">ping file</label> 
+		<div> 
+			<input id="ping_file" type="text">
+			<label for="ping_file">put me in Dropbox to sync pings between multiple machines!</label>
+		</div>
+	</div> -->
+	<div class="setting">
+		<label for="auth.beeminder">beeminder <script>external_link('https://www.beeminder.com/api/v1/auth_token.json','auth token')</script></label>  
+		<input id="auth.beeminder" type="text">
+	</div>
+<!-- 	<hr>
+	<div>if this tagtime then that beeminder</div>
+	<div>eep, not implemented yet!</div> -->
+<!-- CHANGEME by adding entries for each beeminder graph you want to auto-update
+"bob/job": "job", // send "job" pings to bmndr.com/bob/job:
+"bob/job_success": "job fun", // send "job fun" pings to bmndr.com/bob/job_success (also "fun job" - order is ignored):
+"bob/work": ["job", "study"], // send "job" pings and "study" pings to bmndr.com/bob/work:
+"bob/agency": "! akrasia", // send pings that are not "akrasia" pings to bmndr.com/bob/agency: -->
+<!-- [sync now] -->
+</body></html>
+
+<!-- 
+The `macros` key can be a dictionary of `{search:replacement}` to modify your tags - for instance, if `"macros": {"foo": "spam eggs"}` and you enter `foo foobar` it will be transformed into `spam eggs foobar`.
+here's a way to easily modify your macros key:
+{ rm "$rc"; jq ".macros=$macros" > "$rc"; } < "$rc"
+
+The `ping_sound` key can be a sound file to ping, instead of the default.
+
+Press `↩ enter` at the ping window to open your ping file in an editor. -->
